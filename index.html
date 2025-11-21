@@ -458,12 +458,11 @@
         async function loadProgress() {
             let dataStr = null;
             try {
-                // 2) Синхронизация с VK (приоритет)
+                // 2) СИНХРОНИЗАЦИЯ: Загружаем из облака ВК
                 const res = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_save_v1'] });
                 if (res.keys && res.keys[0].value) dataStr = res.keys[0].value;
             } catch(e) {}
             
-            // Если в ВК пусто, берем локал
             if (!dataStr) dataStr = localStorage.getItem('sb_save_v1');
             
             if (dataStr) {
@@ -473,10 +472,7 @@
         }
 
         async function clearProgress() {
-            // Не удаляем статистику! Только текущую игру
-            // Но так как мы сохраняем всё в одном объекте, мы просто сбросим grid и score, но оставим stats
-            // В функции endGame и init мы уже обновляем stats перед сохранением нового состояния
-            // Чтобы "очистить" прогресс партии, мы просто сохраним "чистую" партию
+            // Сохраняем "пустую" игру, но с сохраненной статистикой
             const cleanData = { grid: [], score: 0, availablePieces: [], stats: stats, timestamp: Date.now() };
             const dataStr = JSON.stringify(cleanData);
             localStorage.setItem('sb_save_v1', dataStr);
@@ -540,7 +536,7 @@
             const savedData = await loadProgress();
 
             if (savedData && savedData.stats) {
-                stats = savedData.stats; // Восстанавливаем статистику из облака/кеша
+                stats = savedData.stats;
             }
 
             if (isFirstRun) {
@@ -597,7 +593,6 @@
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             draw();
             gameLoop();
-            // Сохраняем "чистый" старт чтобы сбросить предыдущую игру в облаке
             saveProgress(); 
         }
 
@@ -658,8 +653,7 @@
             isClearingLines = true; pixelsToAnimate = pixels;
             clearAnimationTimer = CLEAR_ANIMATION_DURATION;
             playSound('combo');
-            // 3) Вибрация очистки (успех)
-            vibrate('success'); 
+            vibrate('success'); // 3) Вибрация очистки
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
             showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
@@ -716,11 +710,10 @@
             gameOver = true;
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
-            // Не очищаем, а сохраняем состояние проигрыша, чтобы статистика обновилась
             saveProgress();
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
-            vibrate('error'); // Вибрация неудачи
+            vibrate('error'); // Вибрация проигрыша
             showInterstitialAd();
         }
 
@@ -751,7 +744,7 @@
             if (x >= 0 && x < MICRO_COLS && y >= 0 && y < MICRO_ROWS) {
                 const colorVal = Math.abs(grid[y][x]);
                 if (colorVal !== 0) {
-                    playSound('magic'); vibrate('heavy'); // 3) Магия - сильная вибрация
+                    playSound('magic'); vibrate('heavy'); 
                     for(let r=0; r<MICRO_ROWS; r++) for(let c=0; c<MICRO_COLS; c++) if(Math.abs(grid[r][c]) === colorVal) grid[r][c] = 0;
                     isBoardStable = false; isMagicActive = false; updateMagicState(); saveProgress();
                 }
@@ -826,7 +819,7 @@
             if (!e.target.classList.contains('piece-preview')) return;
             e.preventDefault();
             playSound('pickup');
-            vibrate('light'); // 3) Легкая вибрация при взятии
+            vibrate('light'); // 3) Легкая вибрация
 
             selectedPieceIndex = parseInt(e.target.dataset.index);
             const piece = availablePieces[selectedPieceIndex];
@@ -900,7 +893,7 @@
             if (canPlacePiece(piece, dropY, dropX)) {
                 placePiece(piece, dropY, dropX);
                 playSound('drop');
-                vibrate('medium'); // 3) Средняя при броске
+                vibrate('medium'); // 3) Вибрация броска
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
@@ -980,30 +973,22 @@
 
         function playSound(name) { if (settings.sound && sounds[name]) { sounds[name].currentTime = 0; sounds[name].play().catch(e => {}); } }
         
-        // 3) Функция вибрации с поддержкой VK Bridge (iOS Taptic Engine)
+        // 3) Короткая вибрация (исправлено)
         function vibrate(type) {
             if (!settings.vibration) return;
             
             if (vkBridge.supports("VKWebAppTapticImpactOccurred")) {
-                // Маппинг типов на стили VK
-                let style = 'light';
-                if (type === 'medium') style = 'medium';
-                if (type === 'heavy') style = 'heavy';
-                
-                if (type === 'success') {
-                     vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "success" });
-                } else if (type === 'error') {
-                     vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "error" });
-                } else {
-                     vkBridge.send("VKWebAppTapticImpactOccurred", { style: style });
-                }
+                // Для VK на iOS используем Taptic Engine
+                if (type === 'success') vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "success" });
+                else if (type === 'error') vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "error" });
+                else vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }); // Всегда light для краткости
             } else if (navigator.vibrate) {
-                // Фоллбек для обычного веба/Android
-                let pattern = 20;
-                if (type === 'medium') pattern = 30;
-                if (type === 'heavy') pattern = 50;
-                if (type === 'success') pattern = [50, 50, 50];
-                if (type === 'error') pattern = [100, 50, 100];
+                // Для Android уменьшены значения в 2 раза
+                let pattern = 10; // light (взятие)
+                if (type === 'medium') pattern = 15; // бросок
+                if (type === 'heavy') pattern = 25; // магия
+                if (type === 'success') pattern = [25, 25, 25]; // линия
+                if (type === 'error') pattern = [50, 25, 50]; // проигрыш
                 navigator.vibrate(pattern);
             }
         }
@@ -1033,18 +1018,22 @@
 
         // --- ОБУЧЕНИЕ (1) ---
         let tutorialRunning = false;
+        let tutorialLoopId = null; // 1) ID для контроля цикла обучения
         let tutCanvas, tutCtx;
         let tutStep = 0;
         let tutTimer = 0;
         let tutGrid = []; 
 
         function initTutorial() {
+            // 1) Сброс предыдущего цикла, если он был
+            if (tutorialLoopId) cancelAnimationFrame(tutorialLoopId);
+            
             tutCanvas = document.getElementById('tutorial-canvas');
             tutCtx = tutCanvas.getContext('2d');
             tutorialRunning = true;
             tutStep = 0; tutTimer = 0;
             tutGrid = Array.from({length: 35}, () => Array(30).fill(0));
-            requestAnimationFrame(updateTutorial);
+            updateTutorial(); // Запуск
         }
 
         function updateTutorial() {
@@ -1053,7 +1042,7 @@
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
 
-            // 1) Замедление обучения в 3 раза (было 0.5, стало 0.15)
+            // 1) Замедление обучения. Таймер растет медленно и линейно
             tutTimer += 0.15; 
             
             const handX_start = 40; const handX_end = 100;
@@ -1138,7 +1127,9 @@
             tutCtx.fillStyle = '#555';
             tutCtx.fillRect(0, 31 * T_SCALE, 30 * T_SCALE, 5);
 
-            if (tutorialRunning) requestAnimationFrame(updateTutorial);
+            if (tutorialRunning) {
+                tutorialLoopId = requestAnimationFrame(updateTutorial);
+            }
         }
 
         function drawHandWithBlock(x, y) {
