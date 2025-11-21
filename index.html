@@ -30,7 +30,6 @@
             justify-content: center;
         }
 
-        /* Шапка */
         #top-bar {
             background: transparent;
             padding: 5px 0;
@@ -79,16 +78,15 @@
             z-index: 2;
         }
 
-        /* Игровое поле - Максимально гибкое */
         #game-container-flex {
-            flex: 1 1 auto; /* Растягиваемся, но можем сжиматься */
+            flex: 1 1 auto;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 5px;
             width: 100%;
             overflow: hidden;
-            min-height: 0; /* Важно для Flexbox, чтобы не переполнялся */
+            min-height: 0;
         }
 
         #game-wrapper {
@@ -97,7 +95,6 @@
             border-radius: 8px;
             background-color: #000; 
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            /* Размеры задаст JS */
         }
 
         canvas#gameCanvas {
@@ -106,7 +103,6 @@
             cursor: crosshair;
         }
 
-        /* Подвал */
         #controls-area {
             background: transparent;
             display: flex;
@@ -117,7 +113,6 @@
             flex-shrink: 0;
             width: 100%;
             max-width: 500px;
-            /* Отступ снизу для iPhone и баннера */
             padding-bottom: max(10px, env(safe-area-inset-bottom)); 
         }
 
@@ -179,7 +174,7 @@
 
         #pieces-container {
             width: 100%;
-            height: 80px; /* Увеличена высота для крупных фигур */
+            height: 80px;
             display: flex;
             justify-content: space-around;
             align-items: center;
@@ -189,7 +184,6 @@
         .piece-preview {
             background-color: transparent;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-            /* Увеличенные фигуры */
             max-width: 30%; 
             max-height: 90%;
             touch-action: none;
@@ -296,6 +290,15 @@
             display: block;
             max-width: 100%;
         }
+        
+        #tutorial-text {
+            font-size: 1.2rem;
+            color: #fff;
+            margin: 15px 0;
+            min-height: 1.5em;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00f7ff;
+        }
     </style>
 </head>
 <body>
@@ -371,11 +374,12 @@
         </div>
     </div>
 
+    <!-- Обучение с текстом -->
     <div id="tutorial-modal" class="modal">
         <div class="modal-content">
             <h2>Как играть</h2>
             <canvas id="tutorial-canvas" width="240" height="280"></canvas>
-            <p style="font-size: 0.9em; margin: 10px 0;">Перетащи фигуру -> Собери линию!</p>
+            <div id="tutorial-text">Возьми фигуру</div>
             <button class="modal-btn primary" id="close-tutorial-btn">Всё понятно!</button>
         </div>
     </div>
@@ -404,6 +408,7 @@
         const gameWrapper = document.getElementById('game-wrapper');
         const topBar = document.getElementById('top-bar');
         const controlsArea = document.getElementById('controls-area');
+        const tutorialTextDiv = document.getElementById('tutorial-text');
 
         const sounds = {
             bg: document.getElementById('snd_bg'),
@@ -441,7 +446,7 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- СОХРАНЕНИЕ (4) ---
+        // --- СОХРАНЕНИЕ ---
         async function saveProgress() {
             if (gameOver) return;
             const saveData = { grid, score, availablePieces, stats, timestamp: Date.now() };
@@ -453,10 +458,14 @@
         async function loadProgress() {
             let dataStr = null;
             try {
+                // 2) Синхронизация с VK (приоритет)
                 const res = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_save_v1'] });
                 if (res.keys && res.keys[0].value) dataStr = res.keys[0].value;
             } catch(e) {}
+            
+            // Если в ВК пусто, берем локал
             if (!dataStr) dataStr = localStorage.getItem('sb_save_v1');
+            
             if (dataStr) {
                 try { return JSON.parse(dataStr); } catch(e) { return null; }
             }
@@ -464,11 +473,16 @@
         }
 
         async function clearProgress() {
-            localStorage.removeItem('sb_save_v1');
-            try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_v1', value: '' }); } catch(e){}
+            // Не удаляем статистику! Только текущую игру
+            // Но так как мы сохраняем всё в одном объекте, мы просто сбросим grid и score, но оставим stats
+            // В функции endGame и init мы уже обновляем stats перед сохранением нового состояния
+            // Чтобы "очистить" прогресс партии, мы просто сохраним "чистую" партию
+            const cleanData = { grid: [], score: 0, availablePieces: [], stats: stats, timestamp: Date.now() };
+            const dataStr = JSON.stringify(cleanData);
+            localStorage.setItem('sb_save_v1', dataStr);
+            try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_v1', value: dataStr }); } catch(e){}
         }
 
-        // Автосохранение при выходе
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === 'hidden') saveProgress();
         });
@@ -494,15 +508,13 @@
             } else onSuccess();
         }
 
-        // --- АДАПТАЦИЯ (5) ---
+        // --- АДАПТАЦИЯ ---
         function resizeGame() {
-            // Вычисляем высоту, доступную ДЛЯ ИГРЫ (между шапкой и подвалом)
             const topH = topBar.offsetHeight;
-            const bottomH = controlsArea.offsetHeight + bannerHeight; // Учитываем баннер
-            const availableH = window.innerHeight - topH - bottomH - 10; // 10px запас
+            const bottomH = controlsArea.offsetHeight + bannerHeight; 
+            const availableH = window.innerHeight - topH - bottomH - 10; 
             const availableW = window.innerWidth - 10;
 
-            // Размер пикселя для вписывания поля
             MICRO_PIXEL_SIZE = Math.min(availableW / MICRO_COLS, availableH / MICRO_ROWS);
             if (MICRO_PIXEL_SIZE < 2) MICRO_PIXEL_SIZE = 2;
 
@@ -512,7 +524,6 @@
             gameWrapper.style.width = canvas.width + 'px';
             gameWrapper.style.height = canvas.height + 'px';
             
-            // Отступ снизу для баннера
             controlsArea.style.paddingBottom = (10 + bannerHeight) + 'px';
 
             if (!grid || grid.length === 0) grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
@@ -525,16 +536,18 @@
             resizeGame();
             showBannerAd();
             
-            // 3) Первый запуск?
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
             const savedData = await loadProgress();
 
+            if (savedData && savedData.stats) {
+                stats = savedData.stats; // Восстанавливаем статистику из облака/кеша
+            }
+
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
-                init(); // Сначала инициализируем, чтобы фон был
-                startTutorialDirectly(); // Потом сразу запускаем обучение
-            } else if (savedData && savedData.score > 0 && !savedData.gameOver) {
-                // 4) Продолжить?
+                init();
+                startTutorialDirectly();
+            } else if (savedData && savedData.score > 0 && savedData.grid && savedData.grid.length > 0) {
                 document.getElementById('welcome-modal').style.display = 'flex';
                 document.getElementById('welcome-continue-btn').onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
@@ -558,8 +571,8 @@
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             grid = data.grid;
             score = data.score;
-            availablePieces = data.availablePieces;
-            stats = data.stats || { gamesPlayed: 0, record: 0 };
+            availablePieces = data.availablePieces || [];
+            stats = data.stats || stats;
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
@@ -572,7 +585,6 @@
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
-            clearProgress();
             resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             score = 0; gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false;
@@ -585,6 +597,8 @@
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             draw();
             gameLoop();
+            // Сохраняем "чистый" старт чтобы сбросить предыдущую игру в облаке
+            saveProgress(); 
         }
 
         function gameLoop() {
@@ -604,7 +618,7 @@
                 }
             }
             draw();
-            if (!isClearingLines) checkGameOver(); // 2) Проверка теперь всегда вызывается
+            if (!isClearingLines) checkGameOver();
             gameLoopId = requestAnimationFrame(gameLoop);
         }
 
@@ -644,7 +658,8 @@
             isClearingLines = true; pixelsToAnimate = pixels;
             clearAnimationTimer = CLEAR_ANIMATION_DURATION;
             playSound('combo');
-            vibrate(50); // 6) Вибрация на очистку
+            // 3) Вибрация очистки (успех)
+            vibrate('success'); 
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
             showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
@@ -680,10 +695,8 @@
             return allPixelsToClear;
         }
 
-        // 2) Исправленная проверка Game Over
         function checkGameOver() {
             if (isBoardStable) {
-                // Проверяем линию смерти и 2 линии выше для надежности
                 for(let r = 0; r < 3; r++) {
                     const rowToCheck = GAME_OVER_LINE_ROW - r;
                     if (rowToCheck >= 0) {
@@ -699,15 +712,15 @@
         }
 
         function endGame() {
-            if (gameOver) return; // Защита от двойного вызова
+            if (gameOver) return;
             gameOver = true;
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
-            clearProgress();
-            saveStats();
+            // Не очищаем, а сохраняем состояние проигрыша, чтобы статистика обновилась
+            saveProgress();
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
-            vibrate([200, 100, 200]);
+            vibrate('error'); // Вибрация неудачи
             showInterstitialAd();
         }
 
@@ -738,7 +751,7 @@
             if (x >= 0 && x < MICRO_COLS && y >= 0 && y < MICRO_ROWS) {
                 const colorVal = Math.abs(grid[y][x]);
                 if (colorVal !== 0) {
-                    playSound('magic'); vibrate(50);
+                    playSound('magic'); vibrate('heavy'); // 3) Магия - сильная вибрация
                     for(let r=0; r<MICRO_ROWS; r++) for(let c=0; c<MICRO_COLS; c++) if(Math.abs(grid[r][c]) === colorVal) grid[r][c] = 0;
                     isBoardStable = false; isMagicActive = false; updateMagicState(); saveProgress();
                 }
@@ -788,7 +801,6 @@
                 const preview = document.createElement('canvas');
                 preview.className = 'piece-preview';
                 preview.dataset.index = index;
-                // 3) Увеличенные фигуры внизу (блок 18px)
                 const blockSize = 18; 
                 const w = piece.shape[0].length * blockSize;
                 const h = piece.shape.length * blockSize;
@@ -814,7 +826,7 @@
             if (!e.target.classList.contains('piece-preview')) return;
             e.preventDefault();
             playSound('pickup');
-            vibrate(20); // 6) Вибрация взятия
+            vibrate('light'); // 3) Легкая вибрация при взятии
 
             selectedPieceIndex = parseInt(e.target.dataset.index);
             const piece = availablePieces[selectedPieceIndex];
@@ -856,9 +868,8 @@
             const dw = draggedPieceElement.width;
             const dh = draggedPieceElement.height;
             let targetX = clientX - dw / 2;
-            let targetY = isTouch ? (clientY - dh * 2.0) : (clientY - dh / 2); // Смещение для пальца
+            let targetY = isTouch ? (clientY - dh * 2.0) : (clientY - dh / 2);
             
-            // 5) Адаптация ПК - чтобы не уходило за пределы canvas по горизонтали
             const minX = rect.left;
             const maxX = rect.right - dw;
             if (targetX < minX) targetX = minX;
@@ -889,7 +900,7 @@
             if (canPlacePiece(piece, dropY, dropX)) {
                 placePiece(piece, dropY, dropX);
                 playSound('drop');
-                vibrate(30); // 6) Вибрация броска
+                vibrate('medium'); // 3) Средняя при броске
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
@@ -968,8 +979,35 @@
         }
 
         function playSound(name) { if (settings.sound && sounds[name]) { sounds[name].currentTime = 0; sounds[name].play().catch(e => {}); } }
-        function vibrate(ms) { if (settings.vibration && navigator.vibrate) navigator.vibrate(ms); }
-        function saveStats() { localStorage.setItem('sb_games', stats.gamesPlayed); localStorage.setItem('sb_record', stats.record); }
+        
+        // 3) Функция вибрации с поддержкой VK Bridge (iOS Taptic Engine)
+        function vibrate(type) {
+            if (!settings.vibration) return;
+            
+            if (vkBridge.supports("VKWebAppTapticImpactOccurred")) {
+                // Маппинг типов на стили VK
+                let style = 'light';
+                if (type === 'medium') style = 'medium';
+                if (type === 'heavy') style = 'heavy';
+                
+                if (type === 'success') {
+                     vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "success" });
+                } else if (type === 'error') {
+                     vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "error" });
+                } else {
+                     vkBridge.send("VKWebAppTapticImpactOccurred", { style: style });
+                }
+            } else if (navigator.vibrate) {
+                // Фоллбек для обычного веба/Android
+                let pattern = 20;
+                if (type === 'medium') pattern = 30;
+                if (type === 'heavy') pattern = 50;
+                if (type === 'success') pattern = [50, 50, 50];
+                if (type === 'error') pattern = [100, 50, 100];
+                navigator.vibrate(pattern);
+            }
+        }
+
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.body.addEventListener('click', () => { if(settings.sound && sounds.bg.paused) playSound('bg'); }, {once: true});
 
@@ -998,14 +1036,14 @@
         let tutCanvas, tutCtx;
         let tutStep = 0;
         let tutTimer = 0;
-        let tutGrid = []; // Симуляция песка
+        let tutGrid = []; 
 
         function initTutorial() {
             tutCanvas = document.getElementById('tutorial-canvas');
             tutCtx = tutCanvas.getContext('2d');
             tutorialRunning = true;
             tutStep = 0; tutTimer = 0;
-            tutGrid = Array.from({length: 35}, () => Array(30).fill(0)); // Мини-сетка 30x35
+            tutGrid = Array.from({length: 35}, () => Array(30).fill(0));
             requestAnimationFrame(updateTutorial);
         }
 
@@ -1015,14 +1053,14 @@
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
 
-            // Замедление: обновляем логику раз в 2 кадра
-            tutTimer += 0.5; 
+            // 1) Замедление обучения в 3 раза (было 0.5, стало 0.15)
+            tutTimer += 0.15; 
             
             const handX_start = 40; const handX_end = 100;
             const handY = 30; const blockY_end = 200;
-            const T_SCALE = 8; // Размер пикселя в обучении
+            const T_SCALE = 8; 
 
-            // Физика песка в обучении (упрощенная)
+            // Физика
             for (let y = 33; y >= 0; y--) {
                 for (let x = 0; x < 30; x++) {
                     if (tutGrid[y][x] !== 0) {
@@ -1038,24 +1076,29 @@
                 }
             }
 
+            // Текст обучения
+            const textEl = document.getElementById('tutorial-text');
+
             // Логика шагов
-            if (tutStep === 0) { // Рука
+            if (tutStep === 0) { 
+                textEl.textContent = "Возьми фигуру";
                 drawHandWithBlock(handX_start, handY);
                 if (tutTimer > 30) { tutStep = 1; tutTimer = 0; }
             }
-            else if (tutStep === 1) { // Движение
+            else if (tutStep === 1) { 
+                textEl.textContent = "Перетащи";
                 const progress = Math.min(tutTimer / 40, 1);
                 const curX = handX_start + (handX_end - handX_start) * progress;
                 drawHandWithBlock(curX, handY);
                 if (tutTimer > 50) { tutStep = 2; tutTimer = 0; }
             }
-            else if (tutStep === 2) { // Падение
+            else if (tutStep === 2) { 
+                textEl.textContent = "Отпусти";
                 const progress = Math.min(tutTimer / 30, 1);
                 const curY = handY + 20 + (blockY_end - (handY + 20)) * progress;
                 if (progress < 1) {
                     drawBlock(handX_end, curY);
                 } else {
-                    // Превращаем в песок
                     for(let r=0; r<3; r++) for(let c=0; c<3; c++) {
                         let gx = Math.floor(handX_end/T_SCALE) + c;
                         let gy = Math.floor(blockY_end/T_SCALE) + r;
@@ -1064,19 +1107,19 @@
                     tutStep = 3; tutTimer = 0;
                 }
             }
-            else if (tutStep === 3) { // Рассыпание и спавн линии
+            else if (tutStep === 3) { 
+                textEl.textContent = "Собери линию";
                 if (tutTimer > 60) { 
-                    // Спавним линию
                     for(let x=2; x<28; x++) tutGrid[30][x] = 2;
                     tutStep = 4; tutTimer = 0; 
                 }
             }
-            else if (tutStep === 4) { // Удаление
-                if (Math.floor(tutTimer / 15) % 2 === 0) { // Мигание
+            else if (tutStep === 4) { 
+                if (Math.floor(tutTimer / 15) % 2 === 0) { 
                      tutCtx.fillStyle = 'rgba(255,255,255,0.5)';
                      tutCtx.fillRect(16, 30 * T_SCALE, 26 * T_SCALE, T_SCALE);
                 }
-                if (tutTimer > 90) { // Очистка
+                if (tutTimer > 90) { 
                     tutGrid = Array.from({length: 35}, () => Array(30).fill(0));
                     tutStep = 0; tutTimer = 0; 
                 }
@@ -1092,7 +1135,6 @@
                 }
             }
             
-            // Пол
             tutCtx.fillStyle = '#555';
             tutCtx.fillRect(0, 31 * T_SCALE, 30 * T_SCALE, 5);
 
