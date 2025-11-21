@@ -2,287 +2,612 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sand Blast</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sand Blast Ultimate</title>
     <style>
+        /* Отключение выделения, скролла и контекстного меню */
+        * {
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+
         body {
-            background-color: #1a1a2e;
+            background-color: #121212;
             color: #e0e0e0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             margin: 0;
-            padding: 10px;
-            touch-action: manipulation;
+            padding: 0;
             overflow: hidden;
-            user-select: none; /* Запрещаем выделение текста при перетаскивании */
-        }
-        #main-container {
+            width: 100vw;
+            height: 100vh;
+            /* Используем height: 100dvh для мобильных браузеров, если поддерживается */
+            height: 100dvh; 
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
+            justify-content: space-between;
         }
+
+        /* Верхняя панель */
+        #top-bar {
+            width: 100%;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1f1f2e;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.6);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
         h1 {
+            font-size: 1.2rem;
+            margin: 0 0 5px 0;
             color: #f2f2f2;
-            text-shadow: 0 0 10px #e94560;
-            margin: 0;
+            text-shadow: 0 0 8px #e94560;
+            display: none;
         }
-        #game-wrapper {
+        @media (min-height: 650px) {
+            h1 { display: block; }
+        }
+
+        #score-container {
+            width: 95%;
+            max-width: 450px;
             position: relative;
-            border: 4px solid #0f3460;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            background-color: #000;
+            height: 30px;
         }
-        canvas#gameCanvas {
-            display: block;
-            border-radius: 6px;
-        }
-        .popup-text {
-            position: absolute;
-            left: 50%;
-            top: 40%;
-            transform: translate(-50%, -50%);
-            font-size: 2.5em;
-            font-weight: bold;
-            color: white;
-            text-shadow: 3px 3px 0px #ff00de, -3px -3px 0px #00f7ff;
-            pointer-events: none;
-            opacity: 0;
-            transition: all 0.5s ease-out;
-            text-align: center;
-        }
-        #gameOverScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
+        
+        #score-bar-bg {
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.75);
+            background-color: #0f3460;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 2px solid #333;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #score-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            transition: width 0.3s ease-out;
+            box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        #score-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1rem;
+            font-weight: 800;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            white-space: nowrap;
+            z-index: 2;
+        }
+
+        /* Игровая область */
+        #game-wrapper {
+            position: relative;
+            border: 2px solid #0f3460;
+            border-radius: 8px;
+            background-color: #000;
+            margin: 5px 0;
+            flex-grow: 0; 
+            flex-shrink: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            /* Важно для адаптива: не даем вылезать за пределы flex-контейнера */
+            max-height: 100%; 
+        }
+
+        canvas#gameCanvas {
+            display: block;
+            border-radius: 4px;
+            cursor: crosshair;
+        }
+
+        /* Нижняя панель */
+        #controls-area {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+            background: #1f1f2e;
+            border-top: 1px solid #333;
+            flex-shrink: 0;
+            /* Безопасный отступ для iPhone */
+            padding-bottom: max(10px, env(safe-area-inset-bottom)); 
+        }
+
+        #pieces-container {
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: transparent;
+            border-radius: 0;
+            padding: 2px;
+        }
+
+        .piece-preview {
+            border: none;
+            background-color: transparent;
+            transition: transform 0.1s;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+        .piece-preview:active { transform: scale(0.95); }
+
+        #buttons-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 10px;
+            flex: 1;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .icon-btn:active {
+            transform: translateY(3px);
+            box-shadow: none;
+        }
+
+        #pause-btn { background: linear-gradient(to bottom, #4a4a5e, #2b2b3d); }
+        #magic-btn { background: linear-gradient(to bottom, #d900ff, #9d00b8); }
+        #rank-btn { background: linear-gradient(to bottom, #ffaa00, #cc8800); }
+
+        #magic-btn.active {
+            background: linear-gradient(45deg, #ff00de, #00f7ff);
+            box-shadow: 0 0 20px #ff00de;
+            animation: pulse 0.8s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); box-shadow: 0 0 10px #ff00de; }
+            to { transform: scale(1.05); box-shadow: 0 0 25px #ff00de; }
+        }
+
+        /* Модальные окна */
+        .modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
             display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            text-align: center;
-            border-radius: 6px;
-        }
-        #gameOverScreen h2 {
-            font-size: 3em;
-            color: #e94560;
-            margin: 0;
-            text-shadow: 0 0 10px #e94560;
-        }
-        #restartButton {
-            margin-top: 20px;
-            padding: 15px 30px;
-            font-size: 1.2em;
-            color: white;
-            background: linear-gradient(45deg, #e94560, #ff6b6b);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
-            transition: all 0.2s ease-in-out;
-        }
-        #restartButton:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.6);
-        }
-        #ui-container {
-            width: 100%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-        }
-        .score-box {
-            font-size: 1.8em;
-            font-weight: bold;
-            padding: 10px 20px;
-            background-color: #0f3460;
-            border-radius: 8px;
-            width: 100%;
-            text-align: center;
-            box-sizing: border-box;
-        }
-        #pieces-container {
-            width: 100%;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            background-color: #0f3460;
+            z-index: 100;
             padding: 10px;
+            text-align: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 20px;
+            border: 2px solid #e94560;
+            width: 95%;
+            max-width: 380px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 0 40px rgba(233, 69, 96, 0.3);
+        }
+
+        .modal h2 { color: #e94560; margin-top: 0; font-size: 1.8rem; margin-bottom: 15px;}
+        
+        .modal-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #081b33;
+        }
+        .modal-btn:active { transform: translateY(4px); box-shadow: none; }
+        .modal-btn.primary { 
+            background: linear-gradient(45deg, #e94560, #ff6b6b);
+            box-shadow: 0 4px 0 #a12d40;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 1.1rem;
+            padding: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            font-size: 0.9rem;
+        }
+        .leaderboard-item.me {
+            color: #00f7ff;
+            font-weight: bold;
+            border: 2px solid #00f7ff;
             border-radius: 8px;
-            box-sizing: border-box;
-            height: 68px; /* Фиксированная высота для выравнивания */
+            background: rgba(0, 247, 255, 0.15);
         }
-        .piece-preview {
-            border: 2px solid transparent;
-            border-radius: 5px;
-            cursor: grab;
-            transition: all 0.2s ease-in-out;
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-        .piece-preview:active {
-            cursor: grabbing;
-        }
+
         #dragged-piece {
             position: absolute;
             pointer-events: none;
             z-index: 1000;
-            border: 2px solid #00f7ff;
-            border-radius: 5px;
-            box-shadow: 0 0 15px #00f7ff;
+            opacity: 0.9;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+        }
+
+        .popup-text {
+            position: absolute;
+            color: #fff;
+            font-weight: bold;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #ff00de;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 50;
+        }
+        @keyframes floatUp {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(-60px) scale(1.2); }
+        }
+
+        /* Холст для обучения */
+        #tutorial-canvas {
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #000;
+            margin: 10px auto;
+            display: block;
         }
     </style>
 </head>
 <body>
-    <div id="main-container">
+
+    <audio id="snd_bg" loop> <source src="bg_music.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_pickup"> <source src="pickup.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_drop"> <source src="drop.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_combo"> <source src="combo.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_magic"> <source src="magic.mp3" type="audio/mpeg"> </audio>
+
+    <div id="top-bar">
         <h1>Sand Blast</h1>
-        <div id="game-wrapper">
-            <canvas id="gameCanvas"></canvas>
-            <div id="gameOverScreen">
-                <h2>Игра Окончена</h2>
-                <button id="restartButton">Начать заново</button>
+        <div id="score-container">
+            <div id="score-bar-bg">
+                <div id="score-bar-fill"></div>
             </div>
+            <div id="score-text">0 / 25000</div>
         </div>
-        <div id="ui-container">
-            <div class="score-box">
-                Счёт: <span id="score">0</span>
+    </div>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="controls-area">
+        <div id="buttons-row">
+            <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
+            <button id="magic-btn" class="icon-btn">🪄 Магия</button>
+            <button id="rank-btn" class="icon-btn">🏆 Топ</button>
+        </div>
+        <div id="pieces-container"></div>
+    </div>
+
+    <!-- Меню -->
+    <div id="menu-modal" class="modal">
+        <div class="modal-content">
+            <h2>Меню</h2>
+            <div class="toggle-row">
+                <span>🔊 Звук</span>
+                <input type="checkbox" id="sound-toggle" checked>
             </div>
-            <div id="pieces-container"></div>
+            <div class="toggle-row">
+                <span>📳 Вибрация</span>
+                <input type="checkbox" id="vibration-toggle" checked>
+            </div>
+            <hr style="border-color: #333; margin: 15px 0;">
+            <div style="text-align: center; margin-bottom: 15px; font-size: 1em;">
+                <div style="margin-bottom: 5px;">Игр сыграно: <span id="stat-games" style="color: #00f7ff">0</span></div>
+                <div>Рекорд: <span id="stat-record" style="color: #e94560">0</span></div>
+            </div>
+            <button class="modal-btn" id="tutorial-btn">🎓 Обучение</button>
+            <button class="modal-btn primary" id="resume-btn">▶️ Продолжить</button>
+            <button class="modal-btn" id="restart-menu-btn" style="background: #600f0f; margin-top: 15px;">🔄 Начать заново</button>
+        </div>
+    </div>
+
+    <!-- Рейтинг -->
+    <div id="rank-modal" class="modal">
+        <div class="modal-content">
+            <h2>🏆 Лидеры</h2>
+            <div id="leaderboard-list" style="text-align: left; margin-bottom: 15px;"></div>
+            <button class="modal-btn primary" id="close-rank-btn">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Обучение -->
+    <div id="tutorial-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h2>Как играть</h2>
+            <!-- Анимированный канвас для обучения -->
+            <canvas id="tutorial-canvas" width="200" height="250"></canvas>
+            <p style="font-size: 0.9em; margin: 10px 0;">Перетащи фигуру -> Собери линию!</p>
+            <p style="font-size: 0.9em; color: #aaa">Собери 25,000 очков для розового цвета!</p>
+            <button class="modal-btn primary" id="close-tutorial-btn">Всё понятно!</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameover-modal" class="modal">
+        <div class="modal-content">
+            <h2 style="font-size: 2.2em">Финиш!</h2>
+            <p style="font-size: 1.3em; margin: 20px 0;">Счёт: <span id="final-score" style="color: #00f7ff">0</span></p>
+            <button class="modal-btn primary" id="restart-btn">Играть снова</button>
         </div>
     </div>
 
     <script>
-        // --- Инициализация ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const scoreElement = document.getElementById('score');
         const piecesContainer = document.getElementById('pieces-container');
-        const gameOverScreen = document.getElementById('gameOverScreen');
-        const restartButton = document.getElementById('restartButton');
-        const gameWrapper = document.getElementById('game-wrapper');
+        const scoreText = document.getElementById('score-text');
+        const scoreFill = document.getElementById('score-bar-fill');
+        const magicBtn = document.getElementById('magic-btn');
+        const finalScoreSpan = document.getElementById('final-score');
+        const statGamesSpan = document.getElementById('stat-games');
+        const statRecordSpan = document.getElementById('stat-record');
 
-        // --- Константы ---
+        const sounds = {
+            bg: document.getElementById('snd_bg'),
+            pickup: document.getElementById('snd_pickup'),
+            drop: document.getElementById('snd_drop'),
+            combo: document.getElementById('snd_combo'),
+            magic: document.getElementById('snd_magic')
+        };
+
         const BLOCK_COLS = 15;
         const BLOCK_ROWS = 25;
-        const MICRO_SCALE = 8; // **ИЗМЕНЕНО: Увеличено количество микропикселей**
-        const MICRO_COLS = BLOCK_COLS * MICRO_SCALE;
-        const MICRO_ROWS = BLOCK_ROWS * MICRO_SCALE;
-        const CANVAS_WIDTH = Math.min(window.innerWidth * 0.9, 400);
-        const MICRO_PIXEL_SIZE = CANVAS_WIDTH / MICRO_COLS;
-        canvas.width = CANVAS_WIDTH;
-        canvas.height = MICRO_ROWS * MICRO_PIXEL_SIZE;
-        const GAME_OVER_LINE_ROW = 2 * MICRO_SCALE;
-        const PHYSICS_DELAY = 2; // Немного ускорим физику для большей детализации
-        const CLEAR_ANIMATION_DURATION = 20; // Длительность анимации исчезновения в кадрах
-
-        const COLORS = { 1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33' };
+        
+        // 2: Размер пикселей. Было 8. 
+        // Чтобы увеличить размер пикселя, нужно уменьшить количество микро-ячеек на блок.
+        // 8 / 1.3 ≈ 6.15. Ставим 6.
+        let MICRO_SCALE = 6; 
+        
+        let MICRO_COLS, MICRO_ROWS, MICRO_PIXEL_SIZE;
+        
+        const PHYSICS_ITERS_PER_FRAME = 3; 
+        const CLEAR_ANIMATION_DURATION = 20;
+        
+        // 1: Новый цвет розовый (#FF69B4) вместо салатового
+        const COLORS = { 
+            1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33', 5: '#FF69B4'
+        };
+        
         const PIECES = [
-            { shape: [[1, 1], [1, 1]] }, { shape: [[1, 1, 1, 1]] }, { shape: [[0, 1, 0], [1, 1, 1]] }, { shape: [[1, 1, 0], [0, 1, 1]] }, { shape: [[0, 1, 1], [1, 1, 0]] }, { shape: [[1, 0, 0], [1, 1, 1]] }, { shape: [[0, 0, 1], [1, 1, 1]] }
+            { shape: [[1, 1], [1, 1]] }, 
+            { shape: [[1, 1, 1, 1]] }, 
+            { shape: [[0, 1, 0], [1, 1, 1]] }, 
+            { shape: [[1, 1, 0], [0, 1, 1]] }, 
+            { shape: [[0, 1, 1], [1, 1, 0]] }, 
+            { shape: [[1, 0, 0], [1, 1, 1]] }, 
+            { shape: [[0, 0, 1], [1, 1, 1]] }
         ];
 
-        // --- Состояние Игры ---
-        let grid, score, gameOver, availablePieces, selectedPieceIndex = 0, isDragging = false, frameCounter = 0;
+        let grid = [];
+        let score = 0;
+        let gameOver = false;
+        let isPaused = false;
+        let availablePieces = [];
+        let selectedPieceIndex = -1;
+        let isDragging = false;
         let draggedPieceElement = null;
         let isBoardStable = true;
-        
-        // **НОВОЕ: Состояние для анимации очистки**
         let isClearingLines = false;
         let pixelsToAnimate = [];
         let clearAnimationTimer = 0;
+        let isMagicActive = false;
+        let physicsFrameParity = 0; // Для чередования направления просчета
 
-        // --- Функции Игры ---
+        let settings = { sound: true, vibration: true };
+        let stats = {
+            gamesPlayed: parseInt(localStorage.getItem('sb_games') || '0'),
+            record: parseInt(localStorage.getItem('sb_record') || '0')
+        };
+
+        // --- Адаптация под экран (4) ---
+        function resizeGame() {
+            const headerHeight = document.getElementById('top-bar').offsetHeight;
+            const footerHeight = document.getElementById('controls-area').offsetHeight;
+            
+            // Дополнительный запас для мобильных баров (30px)
+            const availableHeight = window.innerHeight - headerHeight - footerHeight - 30;
+            const availableWidth = window.innerWidth - 10;
+
+            const aspectRatio = (BLOCK_COLS * MICRO_SCALE) / (BLOCK_ROWS * MICRO_SCALE);
+            
+            let displayHeight = availableHeight;
+            let displayWidth = displayHeight * aspectRatio;
+
+            if (displayWidth > availableWidth) {
+                displayWidth = availableWidth;
+                displayHeight = displayWidth / aspectRatio;
+            }
+            
+            // Минимальные размеры
+            if (displayWidth < 200) displayWidth = 200;
+
+            MICRO_COLS = BLOCK_COLS * MICRO_SCALE;
+            MICRO_ROWS = BLOCK_ROWS * MICRO_SCALE;
+            MICRO_PIXEL_SIZE = displayWidth / MICRO_COLS;
+
+            canvas.width = Math.floor(MICRO_COLS * MICRO_PIXEL_SIZE);
+            canvas.height = Math.floor(MICRO_ROWS * MICRO_PIXEL_SIZE);
+            
+            if (!grid || grid.length === 0) {
+                 grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
+            }
+            draw();
+        }
+
+        window.addEventListener('resize', resizeGame);
+
         function init() {
+            resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             score = 0;
             gameOver = false;
-            isDragging = false;
-            frameCounter = 0;
-            isBoardStable = true;
-            isClearingLines = false;
-            pixelsToAnimate = [];
-            clearAnimationTimer = 0;
-            updateScore();
+            isPaused = false;
+            isMagicActive = false;
+            updateMagicState();
+            updateScoreUI();
             generateNewPieces();
-            gameOverScreen.style.display = 'none';
-            if (draggedPieceElement) draggedPieceElement.remove();
-            draggedPieceElement = null;
-            if (!gameLoop.isRunning) gameLoop();
+            document.getElementById('gameover-modal').style.display = 'none';
+            document.getElementById('menu-modal').style.display = 'none';
+            document.body.addEventListener('click', () => {
+                if(settings.sound && sounds.bg.paused) playSound('bg');
+            }, {once: true});
+            if (!gameLoop.isRunning) {
+                gameLoop.isRunning = true;
+                requestAnimationFrame(gameLoop);
+            }
         }
 
         function gameLoop() {
-            gameLoop.isRunning = true;
-            if (gameOver) {
-                showGameOver();
-                gameLoop.isRunning = false;
+            if (isPaused) {
+                if(tutorialRunning) updateTutorial(); // Если открыто обучение
+                requestAnimationFrame(gameLoop);
                 return;
             }
+            if (gameOver) return;
 
-            // Логика игры приостанавливается на время анимации
             if (!isClearingLines) {
-                frameCounter++;
-                if (frameCounter % PHYSICS_DELAY === 0) {
-                    isBoardStable = true;
-                    updatePhysics();
+                for (let i = 0; i < PHYSICS_ITERS_PER_FRAME; i++) {
+                    if (!isBoardStable) {
+                        updatePhysics();
+                    } else {
+                        break;
+                    }
                 }
                 
                 if (isBoardStable) {
                     const pixelsToClear = findConnectedLines();
                     if (pixelsToClear.length > 0) {
-                        isClearingLines = true;
-                        pixelsToAnimate = pixelsToClear;
-                        clearAnimationTimer = CLEAR_ANIMATION_DURATION;
-                        
-                        const points = Math.floor(pixelsToClear.length * 1.5);
-                        score += points;
-                        updateScore();
-                        showPopupText(`+${points}`);
+                        startClearAnimation(pixelsToClear);
                     }
                 }
             }
 
             draw();
             if (!isClearingLines) checkGameOver();
-            
             requestAnimationFrame(gameLoop);
         }
         gameLoop.isRunning = false;
 
+        // 3: Симметричное осыпание
         function updatePhysics() {
+            let movedAny = false;
+            physicsFrameParity = (physicsFrameParity + 1) % 2; // Чередуем 0 и 1
+
             for (let y = MICRO_ROWS - 2; y >= 0; y--) {
-                for (let x = 0; x < MICRO_COLS; x++) {
+                
+                // Логика чередования прохода по X для устранения перекоса влево/вправо
+                const iterateLeftToRight = physicsFrameParity === 0;
+                
+                const startX = iterateLeftToRight ? 0 : MICRO_COLS - 1;
+                const endX = iterateLeftToRight ? MICRO_COLS : -1;
+                const stepX = iterateLeftToRight ? 1 : -1;
+
+                for (let x = startX; x !== endX; x += stepX) {
                     if (grid[y][x] === 0) continue;
+                    
                     let moved = false;
+                    // Вниз
                     if (grid[y + 1][x] === 0) {
                         grid[y + 1][x] = grid[y][x];
                         grid[y][x] = 0;
                         moved = true;
                     } else {
+                        // Диагонали
                         const dir = Math.random() < 0.5 ? 1 : -1;
-                        if (x + dir >= 0 && x + dir < MICRO_COLS && grid[y + 1][x + dir] === 0) {
-                            grid[y + 1][x + dir] = grid[y][x];
-                            grid[y][x] = 0;
+                        // Пробуем сначала случайное направление, потом другое
+                        if (checkAndMove(y, x, dir)) {
                             moved = true;
-                        } else if (x - dir >= 0 && x - dir < MICRO_COLS && grid[y + 1][x - dir] === 0) {
-                            grid[y + 1][x - dir] = grid[y][x];
-                            grid[y][x] = 0;
+                        } else if (checkAndMove(y, x, -dir)) {
                             moved = true;
                         }
                     }
-                    if (moved) isBoardStable = false;
+                    if (moved) movedAny = true;
                 }
             }
+            isBoardStable = !movedAny;
+        }
+
+        function checkAndMove(y, x, dir) {
+            const newX = x + dir;
+            if (newX >= 0 && newX < MICRO_COLS && grid[y + 1][newX] === 0) {
+                grid[y + 1][newX] = grid[y][x];
+                grid[y][x] = 0;
+                return true;
+            }
+            return false;
+        }
+
+        function startClearAnimation(pixels) {
+            isClearingLines = true;
+            pixelsToAnimate = pixels;
+            clearAnimationTimer = CLEAR_ANIMATION_DURATION;
+            playSound('combo');
+            // 6: Короткая вибрация при удалении
+            vibrate(50);
+            const points = Math.floor(pixels.length * 1.5);
+            addScore(points);
+            showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
         }
 
         function findConnectedLines() {
             const visited = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(false));
             const allPixelsToClear = [];
+            
             for (let y = 0; y < MICRO_ROWS; y++) {
                 for (let x = 0; x < MICRO_COLS; x++) {
                     if (grid[y][x] !== 0 && !visited[y][x]) {
@@ -291,22 +616,26 @@
                         const queue = [[y, x]];
                         visited[y][x] = true;
                         let minX = x, maxX = x;
+                        
                         while (queue.length > 0) {
                             const [curY, curX] = queue.shift();
                             group.push([curY, curX]);
                             minX = Math.min(minX, curX);
                             maxX = Math.max(maxX, curX);
-                            const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-                            for (const [dy, dx] of neighbors) {
-                                const nY = curY + dy;
-                                const nX = curX + dx;
+                            
+                            [
+                                [0,1], [0,-1], [1,0], [-1,0],
+                                [1,1], [1,-1], [-1,1], [-1,-1]
+                            ].forEach(([dy, dx]) => {
+                                const nY = curY + dy, nX = curX + dx;
                                 if (nY >= 0 && nY < MICRO_ROWS && nX >= 0 && nX < MICRO_COLS &&
                                     !visited[nY][nX] && Math.abs(grid[nY][nX]) === color) {
                                     visited[nY][nX] = true;
                                     queue.push([nY, nX]);
                                 }
-                            }
+                            });
                         }
+                        
                         if (minX === 0 && maxX === MICRO_COLS - 1) {
                             allPixelsToClear.push(...group);
                         }
@@ -317,65 +646,129 @@
         }
 
         function checkGameOver() {
+            const CHECK_ROW = MICRO_SCALE * 2;
             if (isBoardStable) {
                 for (let x = 0; x < MICRO_COLS; x++) {
-                    if (grid[GAME_OVER_LINE_ROW][x] !== 0) { gameOver = true; break; }
-                }
-            }
-        }
-
-        // --- Функции Отрисовки ---
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawGrid();
-            
-            // **НОВОЕ: Логика анимации исчезновения**
-            if (isClearingLines) {
-                clearAnimationTimer--;
-                const progress = clearAnimationTimer / CLEAR_ANIMATION_DURATION;
-                ctx.globalAlpha = progress; // Плавное исчезновение
-                
-                pixelsToAnimate.forEach(([y, x]) => {
-                    const colorVal = grid[y][x];
-                    if (colorVal === 0) return; // Уже может быть очищен
-                    const baseColor = COLORS[Math.abs(colorVal)];
-                    ctx.fillStyle = colorVal > 0 ? baseColor : darkenColor(baseColor, -30);
-                    
-                    // Эффект сжатия
-                    const size = MICRO_PIXEL_SIZE * progress;
-                    const offset = (MICRO_PIXEL_SIZE - size) / 2;
-                    ctx.fillRect((x * MICRO_PIXEL_SIZE) + offset, (y * MICRO_PIXEL_SIZE) + offset, size, size);
-                });
-                
-                ctx.globalAlpha = 1.0;
-
-                if (clearAnimationTimer <= 0) {
-                    pixelsToAnimate.forEach(([y, x]) => { grid[y][x] = 0; });
-                    isClearingLines = false;
-                    pixelsToAnimate = [];
-                }
-            }
-            
-            drawGameOverLine();
-        }
-        
-        function drawGrid() {
-            for (let y = 0; y < MICRO_ROWS; y++) {
-                for (let x = 0; x < MICRO_COLS; x++) {
-                    const colorVal = grid[y][x];
-                    if (colorVal !== 0) {
-                        const baseColor = COLORS[Math.abs(colorVal)];
-                        // **ИЗМЕНЕНО: Цвет определяется знаком, а не случайно**
-                        ctx.fillStyle = colorVal > 0 ? baseColor : darkenColor(baseColor, -30);
-                        ctx.fillRect(x * MICRO_PIXEL_SIZE, y * MICRO_PIXEL_SIZE, MICRO_PIXEL_SIZE - 0.5, MICRO_PIXEL_SIZE - 0.5);
+                    if (grid[CHECK_ROW][x] !== 0) {
+                        endGame();
+                        break;
                     }
                 }
             }
         }
 
-        function drawGameOverLine() {
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-            ctx.fillRect(0, GAME_OVER_LINE_ROW * MICRO_PIXEL_SIZE, canvas.width, 2);
+        function endGame() {
+            gameOver = true;
+            stats.gamesPlayed++;
+            if (score > stats.record) stats.record = score;
+            saveStats();
+            finalScoreSpan.textContent = score;
+            document.getElementById('gameover-modal').style.display = 'flex';
+            vibrate([100, 50, 100]);
+        }
+
+        function generateNewPieces() {
+            availablePieces = [];
+            for (let i = 0; i < 3; i++) {
+                const shape = PIECES[Math.floor(Math.random() * PIECES.length)].shape;
+                let color;
+                let r = Math.random();
+                if (score >= 25000 && r > 0.9) {
+                     color = 5;
+                } else {
+                    color = Math.floor(Math.random() * 4) + 1;
+                }
+                availablePieces.push({ shape, color });
+            }
+            drawPieceSelectors();
+        }
+
+        function activateMagic() {
+            if (isMagicActive) {
+                isMagicActive = false;
+            } else {
+                isMagicActive = true;
+                showPopupText("Удалить цвет!", canvas.width/2, canvas.height/3);
+            }
+            updateMagicState();
+        }
+
+        function updateMagicState() {
+            if (isMagicActive) {
+                magicBtn.classList.add('active');
+                canvas.style.cursor = 'crosshair';
+            } else {
+                magicBtn.classList.remove('active');
+                canvas.style.cursor = 'default';
+            }
+        }
+
+        function handleCanvasClick(e) {
+            if (!isMagicActive) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / MICRO_PIXEL_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / MICRO_PIXEL_SIZE);
+            
+            if (x >= 0 && x < MICRO_COLS && y >= 0 && y < MICRO_ROWS) {
+                const colorVal = Math.abs(grid[y][x]);
+                if (colorVal !== 0) {
+                    playSound('magic');
+                    vibrate(50);
+                    for(let r=0; r<MICRO_ROWS; r++){
+                        for(let c=0; c<MICRO_COLS; c++){
+                            if(Math.abs(grid[r][c]) === colorVal) grid[r][c] = 0;
+                        }
+                    }
+                    isBoardStable = false;
+                    isMagicActive = false;
+                    updateMagicState();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let animProgress = 1.0;
+            if (isClearingLines) {
+                clearAnimationTimer--;
+                animProgress = clearAnimationTimer / CLEAR_ANIMATION_DURATION;
+                if (clearAnimationTimer <= 0) {
+                    pixelsToAnimate.forEach(([y, x]) => { grid[y][x] = 0; });
+                    isClearingLines = false;
+                    pixelsToAnimate = [];
+                    isBoardStable = false;
+                }
+            }
+
+            for (let y = 0; y < MICRO_ROWS; y++) {
+                for (let x = 0; x < MICRO_COLS; x++) {
+                    const val = grid[y][x];
+                    if (val !== 0) {
+                        let color = COLORS[Math.abs(val)];
+                        if (isClearingLines && pixelsToAnimate.some(p => p[0]===y && p[1]===x)) {
+                             ctx.globalAlpha = animProgress;
+                             const size = MICRO_PIXEL_SIZE * animProgress;
+                             const offset = (MICRO_PIXEL_SIZE - size) / 2;
+                             ctx.fillStyle = color;
+                             ctx.fillRect(x * MICRO_PIXEL_SIZE + offset, y * MICRO_PIXEL_SIZE + offset, size, size);
+                             ctx.globalAlpha = 1.0;
+                        } else {
+                            if (val < 0) color = darkenColor(color, -30);
+                            ctx.fillStyle = color;
+                            ctx.fillRect(x * MICRO_PIXEL_SIZE, y * MICRO_PIXEL_SIZE, MICRO_PIXEL_SIZE, MICRO_PIXEL_SIZE);
+                        }
+                    }
+                }
+            }
+
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.moveTo(0, MICRO_SCALE * 2 * MICRO_PIXEL_SIZE);
+            ctx.lineTo(canvas.width, MICRO_SCALE * 2 * MICRO_PIXEL_SIZE);
+            ctx.stroke();
         }
 
         function drawPieceSelectors() {
@@ -384,70 +777,143 @@
                 const preview = document.createElement('canvas');
                 preview.className = 'piece-preview';
                 preview.dataset.index = index;
-                piecesContainer.appendChild(preview);
+                
+                const blockSize = 16;
+                const w = piece.shape[0].length * blockSize;
+                const h = piece.shape.length * blockSize;
+                preview.width = w;
+                preview.height = h;
+                
                 const pCtx = preview.getContext('2d');
-                const pBlockSize = 12;
-                const shapeWidth = piece.shape[0].length * pBlockSize;
-                const shapeHeight = piece.shape.length * pBlockSize;
-                preview.width = 4 * pBlockSize + 4;
-                preview.height = 4 * pBlockSize + 4;
-                const startX = (preview.width - shapeWidth) / 2;
-                const startY = (preview.height - shapeHeight) / 2;
                 pCtx.fillStyle = COLORS[piece.color];
-                for (let y = 0; y < piece.shape.length; y++) {
-                    for (let x = 0; x < piece.shape[y].length; x++) {
-                        if (piece.shape[y][x] !== 0) pCtx.fillRect(startX + x * pBlockSize, startY + y * pBlockSize, pBlockSize - 1, pBlockSize - 1);
+                
+                for(let y=0; y<piece.shape.length; y++){
+                    for(let x=0; x<piece.shape[y].length; x++){
+                        if(piece.shape[y][x]) {
+                            pCtx.fillRect(x*blockSize, y*blockSize, blockSize-1, blockSize-1);
+                            pCtx.fillStyle = 'rgba(255,255,255,0.2)';
+                            pCtx.fillRect(x*blockSize, y*blockSize, blockSize, blockSize/3);
+                            pCtx.fillStyle = COLORS[piece.color];
+                        }
                     }
                 }
+                piecesContainer.appendChild(preview);
             });
         }
-        
-        // --- UI и Вспомогательные Функции ---
-        function updateScore() { scoreElement.textContent = score; }
-        
-        function generateNewPieces() {
-            availablePieces = [];
-            for (let i = 0; i < 3; i++) {
-                const shape = PIECES[Math.floor(Math.random() * PIECES.length)].shape;
-                const color = Math.floor(Math.random() * 4) + 1;
-                availablePieces.push({ shape, color });
+
+        function handleDragStart(e) {
+            if (gameOver || isPaused || isClearingLines || isMagicActive) return;
+            if (!e.target.classList.contains('piece-preview')) return;
+            e.preventDefault();
+            playSound('pickup');
+            // 6: Короткая вибрация при взятии
+            vibrate(20);
+
+            selectedPieceIndex = parseInt(e.target.dataset.index);
+            const piece = availablePieces[selectedPieceIndex];
+            isDragging = true;
+            
+            draggedPieceElement = document.createElement('canvas');
+            draggedPieceElement.id = 'dragged-piece';
+            
+            const realWidth = piece.shape[0].length * MICRO_SCALE * MICRO_PIXEL_SIZE;
+            const realHeight = piece.shape.length * MICRO_SCALE * MICRO_PIXEL_SIZE;
+            draggedPieceElement.width = realWidth;
+            draggedPieceElement.height = realHeight;
+            
+            const dCtx = draggedPieceElement.getContext('2d');
+            const baseColor = COLORS[piece.color];
+            
+            for(let y=0; y<piece.shape.length; y++){
+                for(let x=0; x<piece.shape[y].length; x++){
+                    if(piece.shape[y][x]){
+                         for(let r=0; r<MICRO_SCALE; r++){
+                            for(let c=0; c<MICRO_SCALE; c++){
+                                dCtx.fillStyle = Math.random() > 0.5 ? baseColor : darkenColor(baseColor, -30);
+                                dCtx.fillRect((x*MICRO_SCALE+c)*MICRO_PIXEL_SIZE, (y*MICRO_SCALE+r)*MICRO_PIXEL_SIZE, MICRO_PIXEL_SIZE, MICRO_PIXEL_SIZE);
+                            }
+                         }
+                    }
+                }
             }
-            drawPieceSelectors();
-        }
-        
-        function showGameOver() { gameOverScreen.style.display = 'flex'; }
-        function showPopupText(text) {
-            const popup = document.createElement('div');
-            popup.className = 'popup-text';
-            popup.textContent = text;
-            gameWrapper.appendChild(popup);
-            setTimeout(() => { popup.style.opacity = '1'; popup.style.top = '30%'; }, 10);
-            setTimeout(() => { popup.style.opacity = '0'; popup.style.top = '20%'; setTimeout(() => popup.remove(), 500); }, 1000);
+            document.body.appendChild(draggedPieceElement);
+            const touch = e.touches ? e.touches[0] : e;
+            updateDragPosition(touch.clientX, touch.clientY);
         }
 
-        function darkenColor(hex, amount) {
-            let r = parseInt(hex.slice(1, 3), 16);
-            let g = parseInt(hex.slice(3, 5), 16);
-            let b = parseInt(hex.slice(5, 7), 16);
-            r = Math.max(0, r + amount);
-            g = Math.max(0, g + amount);
-            b = Math.max(0, b + amount);
-            return `#${(r).toString(16).padStart(2, '0')}${(g).toString(16).padStart(2, '0')}${(b).toString(16).padStart(2, '0')}`;
+        function handleDragMove(e) {
+            if (!isDragging || !draggedPieceElement) return;
+            e.preventDefault();
+            const touch = e.touches ? e.touches[0] : e;
+            updateDragPosition(touch.clientX, touch.clientY);
+        }
+        
+        function updateDragPosition(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const dw = draggedPieceElement.width;
+            const dh = draggedPieceElement.height;
+            
+            let targetX = clientX - dw / 2;
+            let targetY = clientY - dh / 2;
+            
+            const minX = rect.left;
+            const maxX = rect.right - dw;
+
+            if (targetX < minX) targetX = minX;
+            if (targetX > maxX) targetX = maxX;
+            
+            draggedPieceElement.style.left = targetX + 'px';
+            draggedPieceElement.style.top = targetY + 'px';
+            
+            const relX = Math.round((targetX - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
+            const relY = Math.round((targetY - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
+            
+            const piece = availablePieces[selectedPieceIndex];
+            const valid = canPlacePiece(piece, relY, relX);
+            
+            draggedPieceElement.style.opacity = valid ? '1.0' : '0.5';
+            draggedPieceElement.style.filter = valid 
+                ? `drop-shadow(0 0 5px ${COLORS[piece.color]})` 
+                : 'grayscale(100%)';
+        }
+
+        function handleDragEnd(e) {
+            if (!isDragging) return;
+            isDragging = false;
+
+            const rect = canvas.getBoundingClientRect();
+            const currentLeft = parseFloat(draggedPieceElement.style.left);
+            const currentTop = parseFloat(draggedPieceElement.style.top);
+            const dropX = Math.round((currentLeft - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
+            const dropY = Math.round((currentTop - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
+            
+            const piece = availablePieces[selectedPieceIndex];
+            
+            if (canPlacePiece(piece, dropY, dropX)) {
+                placePiece(piece, dropY, dropX);
+                playSound('drop');
+                // 6: Короткая вибрация при установке
+                vibrate(30);
+                availablePieces.splice(selectedPieceIndex, 1);
+                if (availablePieces.length === 0) generateNewPieces();
+                drawPieceSelectors();
+            }
+
+            if (draggedPieceElement) draggedPieceElement.remove();
+            draggedPieceElement = null;
         }
 
         function canPlacePiece(piece, dropY, dropX) {
-            for (let y = 0; y < piece.shape.length; y++) {
-                for (let x = 0; x < piece.shape[y].length; x++) {
-                    if (piece.shape[y][x] !== 0) {
-                        const microX_start = (dropX + x) * MICRO_SCALE;
-                        const microY_start = (dropY + y) * MICRO_SCALE;
-                        for (let r = 0; r < MICRO_SCALE; r++) {
-                            for (let c = 0; c < MICRO_SCALE; c++) {
-                                const checkY = microY_start + r;
-                                const checkX = microX_start + c;
-                                if (checkY < 0 || checkY >= MICRO_ROWS || checkX < 0 || checkX >= MICRO_COLS || grid[checkY][checkX] !== 0) {
-                                    return false;
-                                }
+            for(let y=0; y<piece.shape.length; y++){
+                for(let x=0; x<piece.shape[y].length; x++){
+                    if(piece.shape[y][x]){
+                        const mx = (dropX + x) * MICRO_SCALE;
+                        const my = (dropY + y) * MICRO_SCALE;
+                        if (mx < 0 || mx + MICRO_SCALE > MICRO_COLS || 
+                            my < 0 || my + MICRO_SCALE > MICRO_ROWS) return false;
+                        for (let r=0; r<MICRO_SCALE; r+=MICRO_SCALE-1) {
+                            for(let c=0; c<MICRO_SCALE; c+=MICRO_SCALE-1) {
+                                if (grid[my+r][mx+c] !== 0) return false;
                             }
                         }
                     }
@@ -456,100 +922,255 @@
             return true;
         }
 
-        // --- Обработчики Событий ---
-        function handleDragStart(e) {
-            if (gameOver || !e.target.classList.contains('piece-preview') || isDragging || isClearingLines) return;
-            e.preventDefault();
-            selectedPieceIndex = parseInt(e.target.dataset.index);
-            isDragging = true;
-            
-            // **ИЗМЕНЕНО: Создаем перетаскиваемый элемент нужного размера**
-            const piece = availablePieces[selectedPieceIndex];
-            draggedPieceElement = document.createElement('canvas');
-            draggedPieceElement.id = 'dragged-piece';
-            
-            const pieceWidth = piece.shape[0].length * MICRO_SCALE * MICRO_PIXEL_SIZE;
-            const pieceHeight = piece.shape.length * MICRO_SCALE * MICRO_PIXEL_SIZE;
-            draggedPieceElement.width = pieceWidth;
-            draggedPieceElement.height = pieceHeight;
-
-            const dCtx = draggedPieceElement.getContext('2d');
-            for (let y = 0; y < piece.shape.length; y++) {
-                for (let x = 0; x < piece.shape[y].length; x++) {
-                     if (piece.shape[y][x] !== 0) {
-                        for(let r = 0; r < MICRO_SCALE; r++) {
-                            for(let c = 0; c < MICRO_SCALE; c++) {
-                                const baseColor = COLORS[piece.color];
-                                dCtx.fillStyle = Math.random() < 0.8 ? baseColor : darkenColor(baseColor, -30);
-                                dCtx.fillRect((x * MICRO_SCALE + c) * MICRO_PIXEL_SIZE, (y * MICRO_SCALE + r) * MICRO_PIXEL_SIZE, MICRO_PIXEL_SIZE - 0.5, MICRO_PIXEL_SIZE - 0.5);
+        function placePiece(piece, dropY, dropX) {
+            isBoardStable = false;
+            for(let y=0; y<piece.shape.length; y++){
+                for(let x=0; x<piece.shape[y].length; x++){
+                    if(piece.shape[y][x]){
+                        const mx = (dropX + x) * MICRO_SCALE;
+                        const my = (dropY + y) * MICRO_SCALE;
+                        for(let r=0; r<MICRO_SCALE; r++){
+                            for(let c=0; c<MICRO_SCALE; c++){
+                                const val = piece.color;
+                                grid[my+r][mx+c] = Math.random() > 0.5 ? val : -val;
                             }
                         }
                     }
                 }
             }
-            
-            document.body.appendChild(draggedPieceElement);
-            handleDragMove(e);
         }
 
-        function handleDragMove(e) {
-            if (!isDragging) return;
-            e.preventDefault();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            draggedPieceElement.style.left = `${clientX - draggedPieceElement.width / 2}px`;
-            draggedPieceElement.style.top = `${clientY - draggedPieceElement.height / 2}px`;
-
-            const rect = canvas.getBoundingClientRect();
-            const dropX = Math.floor((clientX - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
-            const dropY = Math.floor((clientY - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
-            const piece = availablePieces[selectedPieceIndex];
+        function updateScoreUI() {
+            let currentLevelBase = Math.floor(score / 25000) * 25000;
+            let nextGoal = currentLevelBase + 25000;
+            let progress = ((score - currentLevelBase) / 25000) * 100;
             
-            draggedPieceElement.style.borderColor = canPlacePiece(piece, dropY, dropX) ? '#00f7ff' : '#e94560';
+            scoreText.textContent = `${score} / ${nextGoal}`;
+            scoreFill.style.width = `${Math.min(100, progress)}%`;
+            
+            if (currentLevelBase >= 25000) {
+                scoreFill.style.background = 'linear-gradient(90deg, #FF00FF, #9d00b8)';
+            } else {
+                scoreFill.style.background = 'linear-gradient(90deg, #e94560, #ff6b6b)';
+            }
         }
 
-        function handleDragEnd(e) {
-            if (!isDragging) return;
-            isDragging = false;
+        function addScore(points) {
+            score += points;
+            updateScoreUI();
+        }
+
+        function showPopupText(text, x, y) {
+            const el = document.createElement('div');
+            el.className = 'popup-text';
+            el.textContent = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function generateLeaderboard() {
+            const names = ["Алексей", "Мария", "Иван", "Елена", "Дмитрий", "Ольга", "Сергей", "Анна", "Николай", "Татьяна"];
+            const list = [];
+            for(let i=0; i<5; i++) {
+                list.push({
+                    rank: i+1,
+                    name: names[i],
+                    score: (8000000 - i*1500000).toLocaleString()
+                });
+            }
+            let playerRank = 10000 - Math.floor(score / 800);
+            if (playerRank < 1) playerRank = 1;
+            const playerEntry = { rank: playerRank, name: "Вы", score: score, isMe: true };
             
-            const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-            const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+            const container = document.getElementById('leaderboard-list');
+            container.innerHTML = '';
             
-            const rect = canvas.getBoundingClientRect();
+            [...list, playerEntry].forEach(item => {
+                const div = document.createElement('div');
+                div.className = `leaderboard-item ${item.isMe ? 'me' : ''}`;
+                div.innerHTML = `
+                    <span>#${item.rank} ${item.rank===1?'🏆':''} ${item.name}</span>
+                    <span>${item.score}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function darkenColor(hex, amount) {
+            let usePound = false;
+            if (hex[0] == "#") { hex = hex.slice(1); usePound = true; }
+            let num = parseInt(hex, 16);
+            let r = (num >> 16) + amount;
+            let b = ((num >> 8) & 0x00FF) + amount;
+            let g = (num & 0x0000FF) + amount;
+            if (r > 255) r = 255; else if (r < 0) r = 0;
+            if (b > 255) b = 255; else if (b < 0) b = 0;
+            if (g > 255) g = 255; else if (g < 0) g = 0;
+            return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16).padStart(6,'0');
+        }
+
+        function playSound(name) {
+            if (settings.sound && sounds[name]) {
+                sounds[name].currentTime = 0;
+                sounds[name].play().catch(e => {});
+            }
+        }
+
+        function vibrate(ms) {
+            if (settings.vibration && navigator.vibrate) {
+                navigator.vibrate(ms);
+            }
+        }
+
+        function saveStats() {
+            localStorage.setItem('sb_games', stats.gamesPlayed);
+            localStorage.setItem('sb_record', stats.record);
+        }
+        
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        magicBtn.addEventListener('click', activateMagic);
+        canvas.addEventListener('click', handleCanvasClick);
+        
+        document.getElementById('pause-btn').addEventListener('click', () => {
+            isPaused = true;
+            tutorialRunning = false; // Остановить анимацию если она была
+            document.getElementById('stat-games').textContent = stats.gamesPlayed;
+            document.getElementById('stat-record').textContent = stats.record;
+            document.getElementById('menu-modal').style.display = 'flex';
+        });
+
+        document.getElementById('resume-btn').addEventListener('click', () => {
+            document.getElementById('menu-modal').style.display = 'none';
+            isPaused = false;
+        });
+
+        document.getElementById('restart-menu-btn').addEventListener('click', init);
+        document.getElementById('restart-btn').addEventListener('click', init);
+
+        document.getElementById('rank-btn').addEventListener('click', () => {
+            isPaused = true;
+            generateLeaderboard();
+            document.getElementById('rank-modal').style.display = 'flex';
+        });
+        document.getElementById('close-rank-btn').addEventListener('click', () => {
+            document.getElementById('rank-modal').style.display = 'none';
+            isPaused = false;
+        });
+
+        // 5: Анимированное обучение
+        let tutorialRunning = false;
+        let tutCanvas, tutCtx, tutGrid;
+        let tutTimer = 0;
+        let tutState = 0; // 0: спавн, 1: падение, 2: ожидание, 3: удаление
+
+        function initTutorial() {
+            tutCanvas = document.getElementById('tutorial-canvas');
+            tutCtx = tutCanvas.getContext('2d');
+            // Маленькая сетка 20x25
+            tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0));
+            tutorialRunning = true;
+            tutState = 0;
+            tutTimer = 0;
+            requestAnimationFrame(updateTutorial);
+        }
+
+        function updateTutorial() {
+            if (!tutorialRunning) return;
+
+            // Рисуем фон
+            tutCtx.fillStyle = '#000';
+            tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
             
-            if (clientX > rect.left && clientX < rect.right && clientY > rect.top && clientY < rect.bottom) {
-                const dropBlockX = Math.floor((clientX - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
-                const dropBlockY = Math.floor((clientY - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
-                const piece = availablePieces[selectedPieceIndex];
-                
-                if (canPlacePiece(piece, dropBlockY, dropBlockX)) {
-                    for (let y = 0; y < piece.shape.length; y++) {
-                        for (let x = 0; x < piece.shape[y].length; x++) {
-                            if (piece.shape[y][x] !== 0) {
-                                const microX = (dropBlockX + x) * MICRO_SCALE;
-                                const microY = (dropBlockY + y) * MICRO_SCALE;
-                                for(let r = 0; r < MICRO_SCALE; r++) {
-                                    for(let c = 0; c < MICRO_SCALE; c++) {
-                                        if ((microY + r) < MICRO_ROWS && (microX + c) < MICRO_COLS) {
-                                           // **ИЗМЕНЕНО: Сохраняем оттенок в сетке**
-                                           const colorVal = piece.color;
-                                           grid[microY + r][microX + c] = Math.random() < 0.8 ? colorVal : -colorVal;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            // Логика демо
+            tutTimer++;
+            const PIXEL_SIZE = 8;
+
+            if (tutState === 0 && tutTimer > 20) {
+                // Спавн песка сверху
+                for(let y=0; y<5; y++) {
+                    for(let x=5; x<15; x++) {
+                        tutGrid[y][x] = 2; // Зеленый
                     }
-                    availablePieces.splice(selectedPieceIndex, 1);
-                    if (availablePieces.length === 0) generateNewPieces();
-                    drawPieceSelectors();
                 }
+                tutState = 1;
+                tutTimer = 0;
             }
             
-            draggedPieceElement.remove();
-            draggedPieceElement = null;
+            if (tutState === 1) {
+                // Физика
+                let moved = false;
+                for (let y = 38; y >= 0; y--) {
+                    for (let x = 0; x < 25; x++) {
+                        if (tutGrid[y][x] !== 0) {
+                             if (tutGrid[y+1] && tutGrid[y+1][x] === 0) {
+                                 tutGrid[y+1][x] = tutGrid[y][x];
+                                 tutGrid[y][x] = 0;
+                                 moved = true;
+                             } else if (tutGrid[y+1]) {
+                                 const dir = Math.random() < 0.5 ? 1 : -1;
+                                 if (x+dir>=0 && x+dir<25 && tutGrid[y+1][x+dir] === 0) {
+                                     tutGrid[y+1][x+dir] = tutGrid[y][x];
+                                     tutGrid[y][x] = 0;
+                                     moved = true;
+                                 }
+                             }
+                        }
+                    }
+                }
+                if (!moved && tutTimer > 60) {
+                    tutState = 2; // Все упало
+                    tutTimer = 0;
+                }
+            }
+
+            if (tutState === 2) {
+                // Рисуем "очистку" (мигание)
+                if (Math.floor(tutTimer / 10) % 2 === 0) {
+                     tutCtx.globalAlpha = 0.5;
+                }
+                if (tutTimer > 60) {
+                    tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0)); // Очистить
+                    tutState = 0;
+                    tutTimer = 0;
+                    tutCtx.globalAlpha = 1.0;
+                }
+            }
+
+            // Отрисовка сетки
+            for (let y = 0; y < 40; y++) {
+                for (let x = 0; x < 25; x++) {
+                    if (tutGrid[y][x] !== 0) {
+                        tutCtx.fillStyle = '#33FF33';
+                        tutCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+                    }
+                }
+            }
+            tutCtx.globalAlpha = 1.0;
+
+            if (tutorialRunning) requestAnimationFrame(updateTutorial);
         }
+
+        document.getElementById('tutorial-btn').addEventListener('click', () => {
+            document.getElementById('menu-modal').style.display = 'none';
+            document.getElementById('tutorial-modal').style.display = 'flex';
+            initTutorial();
+        });
+        document.getElementById('close-tutorial-btn').addEventListener('click', () => {
+             document.getElementById('tutorial-modal').style.display = 'none';
+             document.getElementById('menu-modal').style.display = 'flex';
+             tutorialRunning = false;
+        });
+
+        document.getElementById('sound-toggle').addEventListener('change', (e) => {
+            settings.sound = e.target.checked;
+            if(settings.sound) sounds.bg.play(); else sounds.bg.pause();
+        });
+        document.getElementById('vibration-toggle').addEventListener('change', (e) => {
+            settings.vibration = e.target.checked;
+        });
 
         piecesContainer.addEventListener('mousedown', handleDragStart);
         piecesContainer.addEventListener('touchstart', handleDragStart, { passive: false });
@@ -557,7 +1178,7 @@
         document.addEventListener('touchmove', handleDragMove, { passive: false });
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
-        restartButton.addEventListener('click', init);
+
         init();
     </script>
 </body>
