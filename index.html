@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sand Blast Ultimate</title>
+    <!-- 1) Подключение VK Bridge -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
     <style>
         /* Базовые настройки */
         * {
@@ -15,7 +17,7 @@
         }
 
         body {
-            /* Градиент фона: темно-голубой -> черный -> темно-голубой */
+            /* Градиент фона */
             background: linear-gradient(180deg, #0f2040 0%, #050505 40%, #050505 60%, #0f2040 100%);
             color: #e0e0e0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -28,13 +30,13 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start; /* Изменено на start для учета баннера */
         }
 
         /* --- Верхняя панель (Шапка) --- */
         #top-bar {
             background: transparent;
-            padding: 5px 0;
+            padding: 10px 0;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -80,11 +82,14 @@
 
         /* --- Игровая область --- */
         #game-container-flex {
-            flex-grow: 0;
+            flex-grow: 1;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 2px;
+            width: 100%;
+            /* Важно для центрирования при наличии баннера */
+            position: relative; 
         }
 
         #game-wrapper {
@@ -110,6 +115,8 @@
             padding: 5px 0;
             border-top: none;
             flex-shrink: 0;
+            /* Отступ снизу будет динамически меняться JS-ом для баннера */
+            padding-bottom: 10px; 
         }
 
         #buttons-row {
@@ -149,6 +156,18 @@
             background: linear-gradient(45deg, #ff00de, #00f7ff);
             box-shadow: 0 0 15px #ff00de;
             animation: pulse 0.8s infinite alternate;
+        }
+        
+        /* Иконка рекламы на кнопке */
+        .ad-icon {
+            display: inline-block;
+            background: #fff;
+            color: #d900ff;
+            border-radius: 3px;
+            padding: 0 3px;
+            font-size: 0.7em;
+            margin-left: 5px;
+            vertical-align: middle;
         }
 
         @keyframes pulse {
@@ -277,11 +296,12 @@
 </head>
 <body>
 
-    <audio id="snd_bg" loop> <source src="bg_music.mp3" type="audio/mpeg"> </audio>
-    <audio id="snd_pickup"> <source src="pickup.mp3" type="audio/mpeg"> </audio>
-    <audio id="snd_drop"> <source src="drop.mp3" type="audio/mpeg"> </audio>
-    <audio id="snd_combo"> <source src="combo.mp3" type="audio/mpeg"> </audio>
-    <audio id="snd_magic"> <source src="magic.mp3" type="audio/mpeg"> </audio>
+    <!-- 7) Предзагрузка звуков. Атрибут preload="auto" важен -->
+    <audio id="snd_bg" loop preload="auto"> <source src="bg_music.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_pickup" preload="auto"> <source src="pickup.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_drop" preload="auto"> <source src="drop.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_combo" preload="auto"> <source src="combo.mp3" type="audio/mpeg"> </audio>
+    <audio id="snd_magic" preload="auto"> <source src="magic.mp3" type="audio/mpeg"> </audio>
 
     <div id="top-bar">
         <div id="score-container">
@@ -301,12 +321,14 @@
     <div id="controls-area">
         <div id="buttons-row">
             <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
-            <button id="magic-btn" class="icon-btn">🪄 Магия</button>
+            <!-- 5.2) Кнопка Магия с индикатором рекламы -->
+            <button id="magic-btn" class="icon-btn">🪄 Магия <span class="ad-icon">AD</span></button>
             <button id="rank-btn" class="icon-btn">🏆 Топ</button>
         </div>
         <div id="pieces-container"></div>
     </div>
 
+    <!-- Меню -->
     <div id="menu-modal" class="modal">
         <div class="modal-content">
             <h2>Меню</h2>
@@ -329,6 +351,16 @@
         </div>
     </div>
 
+    <!-- Окно "Продолжить игру?" (4) -->
+    <div id="welcome-modal" class="modal">
+        <div class="modal-content">
+            <h2>Sand Blast</h2>
+            <p style="margin: 20px 0; color: #aaa">Найдена сохраненная игра</p>
+            <button class="modal-btn primary" id="welcome-continue-btn">Продолжить</button>
+            <button class="modal-btn" id="welcome-new-btn">Новая игра</button>
+        </div>
+    </div>
+
     <div id="rank-modal" class="modal">
         <div class="modal-content">
             <h2>🏆 Лидеры</h2>
@@ -342,7 +374,6 @@
             <h2>Как играть</h2>
             <canvas id="tutorial-canvas" width="200" height="250"></canvas>
             <p style="font-size: 0.9em; margin: 10px 0;">Перетащи фигуру -> Собери линию!</p>
-            <p style="font-size: 0.9em; color: #aaa">Розовый цвет открывается на 25,000!</p>
             <button class="modal-btn primary" id="close-tutorial-btn">Всё понятно!</button>
         </div>
     </div>
@@ -356,6 +387,16 @@
     </div>
 
     <script>
+        // --- VK SDK INIT ---
+        const vkBridge = window.vkBridge;
+        let vkUser = null;
+
+        // Инициализация
+        vkBridge.send('VKWebAppInit')
+            .then(() => console.log('VK SDK Initialized'))
+            .catch(e => console.error('VK SDK Init Failed', e));
+
+        // --- Game Logic ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const piecesContainer = document.getElementById('pieces-container');
@@ -376,6 +417,15 @@
             combo: document.getElementById('snd_combo'),
             magic: document.getElementById('snd_magic')
         };
+
+        // 7) Предзагрузка звуков
+        function preloadSounds() {
+            Object.values(sounds).forEach(snd => {
+                snd.load();
+                snd.volume = 0.5; 
+            });
+        }
+        preloadSounds();
 
         const MICRO_COLS = 80;
         const MICRO_ROWS = 100;
@@ -415,20 +465,112 @@
         let clearAnimationTimer = 0;
         let isMagicActive = false;
         let physicsFrameParity = 0;
-        let gameLoopId = null; // Для контроля цикла анимации
+        let gameLoopId = null;
+        let bannerHeight = 0; // 6) Для учета высоты баннера
 
         let settings = { sound: true, vibration: true };
-        let stats = {
-            gamesPlayed: parseInt(localStorage.getItem('sb_games') || '0'),
-            record: parseInt(localStorage.getItem('sb_record') || '0')
-        };
+        let stats = { gamesPlayed: 0, record: 0 };
+
+        // --- СОХРАНЕНИЕ И ЗАГРУЗКА (4, 2) ---
+        async function saveProgress() {
+            if (gameOver) return; // Не сохраняем проигрыш как состояние
+            const saveData = {
+                grid, score, availablePieces, stats, timestamp: Date.now()
+            };
+            const dataStr = JSON.stringify(saveData);
+            
+            // Локально
+            localStorage.setItem('sb_save_v1', dataStr);
+            
+            // В ВК
+            try {
+                await vkBridge.send('VKWebAppStorageSet', {
+                    key: 'sb_save_v1',
+                    value: dataStr
+                });
+            } catch(e) {}
+        }
+
+        async function loadProgress() {
+            // Пробуем ВК, фоллбек на локал
+            let dataStr = null;
+            try {
+                const res = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_save_v1'] });
+                if (res.keys && res.keys[0].value) {
+                    dataStr = res.keys[0].value;
+                }
+            } catch(e) {}
+
+            if (!dataStr) dataStr = localStorage.getItem('sb_save_v1');
+
+            if (dataStr) {
+                try {
+                    const data = JSON.parse(dataStr);
+                    return data;
+                } catch(e) { return null; }
+            }
+            return null;
+        }
+
+        async function clearProgress() {
+            localStorage.removeItem('sb_save_v1');
+            try {
+                await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_v1', value: '' });
+            } catch(e){}
+        }
+
+        // --- РЕКЛАМА (3, 5.1, 5.2, 6) ---
+        function showBannerAd() {
+            // 3) Баннер
+            if (vkBridge.supports("VKWebAppShowBannerAd")) {
+                vkBridge.send("VKWebAppShowBannerAd", {
+                    banner_location: "bottom"
+                }).then((data) => {
+                    if (data.result) {
+                        // 6) Учитываем высоту баннера
+                        // Обычно он оверлей, но мы добавим отступ снизу чтобы кнопки не перекрылись
+                        bannerHeight = 60; // Примерная высота
+                        resizeGame();
+                    }
+                }).catch((e) => console.log(e));
+            }
+        }
+
+        function showInterstitialAd() {
+            // 5.1) Межстраничная реклама
+            if (vkBridge.supports("VKWebAppShowNativeAds")) {
+                vkBridge.send("VKWebAppShowNativeAds", { ad_format: "interstitial" })
+                    .catch(e => console.log(e));
+            }
+        }
+
+        function showRewardedAd(onSuccess) {
+            // 5.2) Rewarded
+            if (vkBridge.supports("VKWebAppShowNativeAds")) {
+                vkBridge.send("VKWebAppShowNativeAds", { ad_format: "reward" })
+                    .then((data) => {
+                        if (data.result) {
+                            onSuccess();
+                        }
+                    })
+                    .catch((e) => {
+                        console.log("Ad error or closed", e);
+                        // Для тестов можно раскомментировать:
+                        // onSuccess(); 
+                    });
+            } else {
+                // Если не поддерживается, просто даем эффект
+                onSuccess();
+            }
+        }
 
         function resizeGame() {
-            const padding = 20; 
-            const uiHeight = 120; 
+            const padding = 10; 
+            // Увеличиваем нижний отступ если есть баннер
+            const controlsHeight = 100 + bannerHeight; 
 
             const availableWidth = window.innerWidth - padding;
-            const availableHeight = window.innerHeight - uiHeight - padding;
+            const availableHeight = window.innerHeight - controlsHeight - padding;
 
             MICRO_PIXEL_SIZE = Math.min(
                 availableWidth / MICRO_COLS,
@@ -445,6 +587,9 @@
 
             topBar.style.width = canvas.width + 'px';
             controlsArea.style.width = canvas.width + 'px';
+            
+            // Применяем отступ для баннера
+            controlsArea.style.paddingBottom = (5 + bannerHeight) + 'px';
 
             if (!grid || grid.length === 0) {
                  grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
@@ -456,18 +601,72 @@
             draw();
         });
 
+        // --- Старт игры ---
+        async function bootGame() {
+            resizeGame();
+            showBannerAd(); // Показываем баннер сразу
+
+            const savedData = await loadProgress();
+            
+            if (savedData) {
+                // 4) Предлагаем продолжить
+                document.getElementById('welcome-modal').style.display = 'flex';
+                
+                document.getElementById('welcome-continue-btn').onclick = () => {
+                    document.getElementById('welcome-modal').style.display = 'none';
+                    restoreGame(savedData);
+                };
+                
+                document.getElementById('welcome-new-btn').onclick = () => {
+                    document.getElementById('welcome-modal').style.display = 'none';
+                    init();
+                };
+            } else {
+                init();
+            }
+        }
+
+        function restoreGame(data) {
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            
+            grid = data.grid;
+            score = data.score;
+            availablePieces = data.availablePieces;
+            stats = data.stats || { gamesPlayed: 0, record: 0 };
+            
+            gameOver = false;
+            isPaused = false;
+            isMagicActive = false;
+            isClearingLines = false;
+            isBoardStable = true; 
+            
+            isDragging = false;
+            selectedPieceIndex = -1;
+            if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
+
+            resizeGame(); // пересчитать размеры под сетку
+            updateScoreUI();
+            drawPieceSelectors();
+            draw();
+            
+            // Звук разблокировка
+            document.body.addEventListener('click', () => {
+                if(settings.sound && sounds.bg.paused) playSound('bg');
+            }, {once: true});
+
+            gameLoop();
+        }
+
         function init() {
-            // Остановка предыдущего цикла, если он есть
             if (gameLoopId) {
                 cancelAnimationFrame(gameLoopId);
                 gameLoopId = null;
             }
 
+            clearProgress(); // Очищаем старое сохранение при новой игре
             resizeGame();
             
-            // Полный сброс сетки
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
-            
             score = 0;
             gameOver = false;
             isPaused = false;
@@ -477,7 +676,6 @@
             isBoardStable = true;
             clearAnimationTimer = 0;
             
-            // Сброс Drag'n'Drop
             isDragging = false;
             selectedPieceIndex = -1;
             if (draggedPieceElement) {
@@ -490,20 +688,16 @@
             generateNewPieces();
             
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
-            
-            // Принудительная отрисовка пустого поля
             draw();
 
             document.body.addEventListener('click', () => {
                 if(settings.sound && sounds.bg.paused) playSound('bg');
             }, {once: true});
             
-            // Запуск цикла
             gameLoop();
         }
 
         function gameLoop() {
-            // Если игра окончена, цикл останавливаем (не запрашиваем кадр)
             if (gameOver) {
                 gameLoopId = null;
                 return;
@@ -528,6 +722,8 @@
                     const pixelsToClear = findConnectedLines();
                     if (pixelsToClear.length > 0) {
                         startClearAnimation(pixelsToClear);
+                        // Сохраняем после успешного хода/очистки
+                        saveProgress();
                     }
                 }
             }
@@ -643,16 +839,20 @@
         }
 
         function endGame() {
-            gameOver = true; // Это остановит следующий кадр в gameLoop
+            gameOver = true;
             stats.gamesPlayed++;
             if (score > stats.record) {
                 stats.record = score;
             }
-            saveStats();
+            clearProgress(); // Очищаем сохранение при проигрыше
+            saveStats(); // Сохраняем только статистику
             
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
             vibrate([200, 100, 200]);
+            
+            // 5.1) Показываем рекламу при проигрыше
+            showInterstitialAd();
         }
 
         function generateNewPieces() {
@@ -669,16 +869,25 @@
                 availablePieces.push({ shape, color });
             }
             drawPieceSelectors();
+            // Сохраняем состояние после генерации (новый ход)
+            if(score > 0) saveProgress();
         }
 
+        // 5.2) Логика Магии с рекламой
         function activateMagic() {
             if (isMagicActive) {
+                // Отмена магии
                 isMagicActive = false;
+                updateMagicState();
             } else {
-                isMagicActive = true;
-                showPopupText("Удалить цвет!", canvas.width/2, canvas.height/3);
+                // Запуск рекламы
+                showRewardedAd(() => {
+                    // Успех
+                    isMagicActive = true;
+                    showPopupText("Удалить цвет!", canvas.width/2, canvas.height/3);
+                    updateMagicState();
+                });
             }
-            updateMagicState();
         }
 
         function updateMagicState() {
@@ -710,6 +919,7 @@
                     isBoardStable = false;
                     isMagicActive = false;
                     updateMagicState();
+                    saveProgress();
                 }
             }
         }
@@ -891,6 +1101,7 @@
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
+                saveProgress(); // Сохраняем после хода
             }
 
             if (draggedPieceElement) draggedPieceElement.remove();
@@ -1046,11 +1257,6 @@
             }
         }
 
-        function saveStats() {
-            localStorage.setItem('sb_games', stats.gamesPlayed);
-            localStorage.setItem('sb_record', stats.record);
-        }
-        
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         magicBtn.addEventListener('click', activateMagic);
@@ -1082,7 +1288,7 @@
             isPaused = false;
         });
 
-        // 3: Улучшенная анимация обучения
+        // Обучение
         let tutorialRunning = false;
         let tutCanvas, tutCtx;
         let tutStep = 0;
@@ -1092,7 +1298,7 @@
             tutCanvas = document.getElementById('tutorial-canvas');
             tutCtx = tutCanvas.getContext('2d');
             tutorialRunning = true;
-            tutStep = 0; // 0: рука появляется, 1: движение, 2: падение, 3: исчезновение
+            tutStep = 0; 
             tutTimer = 0;
             requestAnimationFrame(updateTutorial);
         }
@@ -1194,7 +1400,8 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
-        init();
+        // Запуск с проверкой сохранений
+        bootGame();
     </script>
 </body>
 </html>
