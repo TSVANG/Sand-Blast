@@ -18,7 +18,8 @@
         }
 
         body {
-            background-color: #121212;
+            /* 5: Градиент от темно-голубого сверху вниз и снизу вверх (центр темнее) */
+            background: linear-gradient(180deg, #0f2040 0%, #050505 40%, #050505 60%, #0f2040 100%);
             color: #e0e0e0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
@@ -26,53 +27,40 @@
             overflow: hidden;
             width: 100vw;
             height: 100vh;
-            /* Используем height: 100dvh для мобильных браузеров, если поддерживается */
             height: 100dvh; 
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-between;
         }
 
         /* Верхняя панель */
         #top-bar {
             width: 100%;
-            padding: 10px;
+            padding: 8px 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: #1f1f2e;
+            background: rgba(31, 31, 46, 0.8); /* Полупрозрачность */
             box-shadow: 0 2px 15px rgba(0,0,0,0.6);
             z-index: 10;
             flex-shrink: 0;
         }
 
-        h1 {
-            font-size: 1.2rem;
-            margin: 0 0 5px 0;
-            color: #f2f2f2;
-            text-shadow: 0 0 8px #e94560;
-            display: none;
-        }
-        @media (min-height: 650px) {
-            h1 { display: block; }
-        }
-
+        /* 6: Адаптивный контейнер счета */
         #score-container {
-            width: 95%;
-            max-width: 450px;
+            width: 100%;
+            max-width: 400px; /* Ограничиваем ширину */
             position: relative;
-            height: 30px;
+            height: 28px;
         }
         
         #score-bar-bg {
             width: 100%;
             height: 100%;
             background-color: #0f3460;
-            border-radius: 15px;
+            border-radius: 14px;
             overflow: hidden;
             border: 2px solid #333;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
         }
 
         #score-bar-fill {
@@ -88,28 +76,32 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 800;
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
             white-space: nowrap;
             z-index: 2;
         }
 
-        /* Игровая область */
-        #game-wrapper {
-            position: relative;
-            border: 2px solid #0f3460;
-            border-radius: 8px;
-            background-color: #000;
-            margin: 5px 0;
-            flex-grow: 0; 
-            flex-shrink: 1;
+        /* Центральная часть с игрой */
+        #game-container-flex {
+            flex-grow: 1;
+            width: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
             overflow: hidden;
-            /* Важно для адаптива: не даем вылезать за пределы flex-контейнера */
-            max-height: 100%; 
+            padding: 5px;
+        }
+
+        /* Игровое поле (Фон игры - черный) */
+        #game-wrapper {
+            position: relative;
+            border: 2px solid #0f3460;
+            border-radius: 8px;
+            background-color: #000; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            /* Размеры задаются через JS */
         }
 
         canvas#gameCanvas {
@@ -121,34 +113,45 @@
         /* Нижняя панель */
         #controls-area {
             width: 100%;
-            max-width: 500px;
+            /* 6: Не даем вылезать за рамки игрового поля на широких экранах */
+            max-width: 100%; 
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            padding: 10px;
-            background: #1f1f2e;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(31, 31, 46, 0.9);
             border-top: 1px solid #333;
             flex-shrink: 0;
-            /* Безопасный отступ для iPhone */
-            padding-bottom: max(10px, env(safe-area-inset-bottom)); 
+            padding-bottom: max(8px, env(safe-area-inset-bottom)); 
+        }
+
+        /* Контейнер для кнопок и фигур центрируем по ширине канваса (сделаем через JS resize, но тут зададим ограничения) */
+        .controls-inner {
+            width: 100%;
+            max-width: 500px; /* Максимальная ширина интерфейса */
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         #pieces-container {
             width: 100%;
-            height: 80px;
+            height: 70px;
             display: flex;
             justify-content: space-around;
             align-items: center;
             background-color: transparent;
-            border-radius: 0;
             padding: 2px;
         }
 
         .piece-preview {
-            border: none;
             background-color: transparent;
             transition: transform 0.1s;
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+            /* Максимальный размер превью, чтобы не ломать верстку */
+            max-height: 100%;
+            max-width: 30%;
         }
         .piece-preview:active { transform: scale(0.95); }
 
@@ -162,9 +165,9 @@
             border: none;
             border-radius: 10px;
             color: white;
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: bold;
-            padding: 10px;
+            padding: 10px 5px;
             flex: 1;
             cursor: pointer;
             transition: transform 0.1s, box-shadow 0.2s;
@@ -173,6 +176,7 @@
             align-items: center;
             box-shadow: 0 3px 0 rgba(0,0,0,0.3);
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            white-space: nowrap;
         }
         
         .icon-btn:active {
@@ -204,7 +208,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 100;
+            z-index: 200; /* Поверх всего */
             padding: 10px;
             text-align: center;
             backdrop-filter: blur(8px);
@@ -215,8 +219,8 @@
             padding: 20px;
             border-radius: 20px;
             border: 2px solid #e94560;
-            width: 95%;
-            max-width: 380px;
+            width: 90%;
+            max-width: 350px;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 0 40px rgba(233, 69, 96, 0.3);
@@ -292,13 +296,13 @@
             to { opacity: 0; transform: translateY(-60px) scale(1.2); }
         }
 
-        /* Холст для обучения */
         #tutorial-canvas {
             border: 2px solid #333;
             border-radius: 8px;
             background: #000;
             margin: 10px auto;
             display: block;
+            max-width: 100%;
         }
     </style>
 </head>
@@ -311,7 +315,6 @@
     <audio id="snd_magic"> <source src="magic.mp3" type="audio/mpeg"> </audio>
 
     <div id="top-bar">
-        <h1>Sand Blast</h1>
         <div id="score-container">
             <div id="score-bar-bg">
                 <div id="score-bar-fill"></div>
@@ -320,17 +323,22 @@
         </div>
     </div>
 
-    <div id="game-wrapper">
-        <canvas id="gameCanvas"></canvas>
+    <!-- 6: Контейнер с flex-grow для максимизации поля -->
+    <div id="game-container-flex">
+        <div id="game-wrapper">
+            <canvas id="gameCanvas"></canvas>
+        </div>
     </div>
 
     <div id="controls-area">
-        <div id="buttons-row">
-            <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
-            <button id="magic-btn" class="icon-btn">🪄 Магия</button>
-            <button id="rank-btn" class="icon-btn">🏆 Топ</button>
+        <div class="controls-inner">
+            <div id="buttons-row">
+                <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
+                <button id="magic-btn" class="icon-btn">🪄 Магия</button>
+                <button id="rank-btn" class="icon-btn">🏆 Топ</button>
+            </div>
+            <div id="pieces-container"></div>
         </div>
-        <div id="pieces-container"></div>
     </div>
 
     <!-- Меню -->
@@ -369,7 +377,6 @@
     <div id="tutorial-modal" class="modal">
         <div class="modal-content" style="max-width: 400px;">
             <h2>Как играть</h2>
-            <!-- Анимированный канвас для обучения -->
             <canvas id="tutorial-canvas" width="200" height="250"></canvas>
             <p style="font-size: 0.9em; margin: 10px 0;">Перетащи фигуру -> Собери линию!</p>
             <p style="font-size: 0.9em; color: #aaa">Собери 25,000 очков для розового цвета!</p>
@@ -377,12 +384,12 @@
         </div>
     </div>
 
-    <!-- Game Over -->
+    <!-- 2: Game Over с кнопкой -->
     <div id="gameover-modal" class="modal">
         <div class="modal-content">
-            <h2 style="font-size: 2.2em">Финиш!</h2>
+            <h2 style="font-size: 2.2em">Проигрыш</h2>
             <p style="font-size: 1.3em; margin: 20px 0;">Счёт: <span id="final-score" style="color: #00f7ff">0</span></p>
-            <button class="modal-btn primary" id="restart-btn">Играть снова</button>
+            <button class="modal-btn primary" id="restart-btn">Начать заново</button>
         </div>
     </div>
 
@@ -396,6 +403,7 @@
         const finalScoreSpan = document.getElementById('final-score');
         const statGamesSpan = document.getElementById('stat-games');
         const statRecordSpan = document.getElementById('stat-record');
+        const gameWrapper = document.getElementById('game-wrapper');
 
         const sounds = {
             bg: document.getElementById('snd_bg'),
@@ -407,18 +415,15 @@
 
         const BLOCK_COLS = 15;
         const BLOCK_ROWS = 25;
-        
-        // 2: Размер пикселей. Было 8. 
-        // Чтобы увеличить размер пикселя, нужно уменьшить количество микро-ячеек на блок.
-        // 8 / 1.3 ≈ 6.15. Ставим 6.
         let MICRO_SCALE = 6; 
-        
         let MICRO_COLS, MICRO_ROWS, MICRO_PIXEL_SIZE;
         
         const PHYSICS_ITERS_PER_FRAME = 3; 
         const CLEAR_ANIMATION_DURATION = 20;
         
-        // 1: Новый цвет розовый (#FF69B4) вместо салатового
+        // 4: Линия смерти ниже
+        let GAME_OVER_LINE_ROW; // Будет рассчитан при инициализации
+        
         const COLORS = { 
             1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33', 5: '#FF69B4'
         };
@@ -446,7 +451,7 @@
         let pixelsToAnimate = [];
         let clearAnimationTimer = 0;
         let isMagicActive = false;
-        let physicsFrameParity = 0; // Для чередования направления просчета
+        let physicsFrameParity = 0;
 
         let settings = { sound: true, vibration: true };
         let stats = {
@@ -454,35 +459,43 @@
             record: parseInt(localStorage.getItem('sb_record') || '0')
         };
 
-        // --- Адаптация под экран (4) ---
+        // 6: Улучшенная адаптация
         function resizeGame() {
-            const headerHeight = document.getElementById('top-bar').offsetHeight;
-            const footerHeight = document.getElementById('controls-area').offsetHeight;
+            const topBar = document.getElementById('top-bar');
+            const bottomBar = document.getElementById('controls-area');
             
-            // Дополнительный запас для мобильных баров (30px)
-            const availableHeight = window.innerHeight - headerHeight - footerHeight - 30;
-            const availableWidth = window.innerWidth - 10;
+            // Вычисляем доступное место для игры
+            const availableHeight = window.innerHeight - topBar.offsetHeight - bottomBar.offsetHeight - 10; // 10px отступ
+            const availableWidth = window.innerWidth - 10; // 10px отступ по бокам
 
             const aspectRatio = (BLOCK_COLS * MICRO_SCALE) / (BLOCK_ROWS * MICRO_SCALE);
             
             let displayHeight = availableHeight;
             let displayWidth = displayHeight * aspectRatio;
 
+            // Если по ширине не влезает
             if (displayWidth > availableWidth) {
                 displayWidth = availableWidth;
                 displayHeight = displayWidth / aspectRatio;
             }
             
             // Минимальные размеры
-            if (displayWidth < 200) displayWidth = 200;
+            if (displayWidth < 150) displayWidth = 150;
 
             MICRO_COLS = BLOCK_COLS * MICRO_SCALE;
             MICRO_ROWS = BLOCK_ROWS * MICRO_SCALE;
             MICRO_PIXEL_SIZE = displayWidth / MICRO_COLS;
+            
+            // 4: Красная линия (опускаем ниже, например, на 4 полных блока)
+            GAME_OVER_LINE_ROW = MICRO_SCALE * 4; 
 
             canvas.width = Math.floor(MICRO_COLS * MICRO_PIXEL_SIZE);
             canvas.height = Math.floor(MICRO_ROWS * MICRO_PIXEL_SIZE);
             
+            // Применяем размеры к обертке
+            gameWrapper.style.width = canvas.width + 'px';
+            gameWrapper.style.height = canvas.height + 'px';
+
             if (!grid || grid.length === 0) {
                  grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             }
@@ -501,11 +514,14 @@
             updateMagicState();
             updateScoreUI();
             generateNewPieces();
-            document.getElementById('gameover-modal').style.display = 'none';
-            document.getElementById('menu-modal').style.display = 'none';
+            
+            // Скрываем модальные окна
+            document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+            
             document.body.addEventListener('click', () => {
                 if(settings.sound && sounds.bg.paused) playSound('bg');
             }, {once: true});
+            
             if (!gameLoop.isRunning) {
                 gameLoop.isRunning = true;
                 requestAnimationFrame(gameLoop);
@@ -514,7 +530,7 @@
 
         function gameLoop() {
             if (isPaused) {
-                if(tutorialRunning) updateTutorial(); // Если открыто обучение
+                if(tutorialRunning) updateTutorial();
                 requestAnimationFrame(gameLoop);
                 return;
             }
@@ -543,33 +559,25 @@
         }
         gameLoop.isRunning = false;
 
-        // 3: Симметричное осыпание
         function updatePhysics() {
             let movedAny = false;
-            physicsFrameParity = (physicsFrameParity + 1) % 2; // Чередуем 0 и 1
+            physicsFrameParity = (physicsFrameParity + 1) % 2;
 
             for (let y = MICRO_ROWS - 2; y >= 0; y--) {
-                
-                // Логика чередования прохода по X для устранения перекоса влево/вправо
                 const iterateLeftToRight = physicsFrameParity === 0;
-                
                 const startX = iterateLeftToRight ? 0 : MICRO_COLS - 1;
                 const endX = iterateLeftToRight ? MICRO_COLS : -1;
                 const stepX = iterateLeftToRight ? 1 : -1;
 
                 for (let x = startX; x !== endX; x += stepX) {
                     if (grid[y][x] === 0) continue;
-                    
                     let moved = false;
-                    // Вниз
                     if (grid[y + 1][x] === 0) {
                         grid[y + 1][x] = grid[y][x];
                         grid[y][x] = 0;
                         moved = true;
                     } else {
-                        // Диагонали
                         const dir = Math.random() < 0.5 ? 1 : -1;
-                        // Пробуем сначала случайное направление, потом другое
                         if (checkAndMove(y, x, dir)) {
                             moved = true;
                         } else if (checkAndMove(y, x, -dir)) {
@@ -597,7 +605,6 @@
             pixelsToAnimate = pixels;
             clearAnimationTimer = CLEAR_ANIMATION_DURATION;
             playSound('combo');
-            // 6: Короткая вибрация при удалении
             vibrate(50);
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
@@ -646,10 +653,10 @@
         }
 
         function checkGameOver() {
-            const CHECK_ROW = MICRO_SCALE * 2;
+            // Проверяем пересечение с линией смерти
             if (isBoardStable) {
                 for (let x = 0; x < MICRO_COLS; x++) {
-                    if (grid[CHECK_ROW][x] !== 0) {
+                    if (grid[GAME_OVER_LINE_ROW][x] !== 0) {
                         endGame();
                         break;
                     }
@@ -657,6 +664,7 @@
             }
         }
 
+        // 2: Окно при проигрыше
         function endGame() {
             gameOver = true;
             stats.gamesPlayed++;
@@ -664,7 +672,7 @@
             saveStats();
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
-            vibrate([100, 50, 100]);
+            vibrate([200, 100, 200]);
         }
 
         function generateNewPieces() {
@@ -763,12 +771,19 @@
                 }
             }
 
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-            ctx.lineWidth = 2;
-            ctx.moveTo(0, MICRO_SCALE * 2 * MICRO_PIXEL_SIZE);
-            ctx.lineTo(canvas.width, MICRO_SCALE * 2 * MICRO_PIXEL_SIZE);
-            ctx.stroke();
+            // 4: Яркая красная линия
+            if (GAME_OVER_LINE_ROW) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = "red";
+                const yPos = GAME_OVER_LINE_ROW * MICRO_PIXEL_SIZE;
+                ctx.moveTo(0, yPos);
+                ctx.lineTo(canvas.width, yPos);
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Сброс
+            }
         }
 
         function drawPieceSelectors() {
@@ -806,7 +821,6 @@
             if (!e.target.classList.contains('piece-preview')) return;
             e.preventDefault();
             playSound('pickup');
-            // 6: Короткая вибрация при взятии
             vibrate(20);
 
             selectedPieceIndex = parseInt(e.target.dataset.index);
@@ -837,34 +851,46 @@
                 }
             }
             document.body.appendChild(draggedPieceElement);
+            
             const touch = e.touches ? e.touches[0] : e;
-            updateDragPosition(touch.clientX, touch.clientY);
+            updateDragPosition(touch.clientX, touch.clientY, !!e.touches);
         }
 
         function handleDragMove(e) {
             if (!isDragging || !draggedPieceElement) return;
             e.preventDefault();
             const touch = e.touches ? e.touches[0] : e;
-            updateDragPosition(touch.clientX, touch.clientY);
+            updateDragPosition(touch.clientX, touch.clientY, !!e.touches);
         }
         
-        function updateDragPosition(clientX, clientY) {
+        function updateDragPosition(clientX, clientY, isTouch) {
             const rect = canvas.getBoundingClientRect();
             const dw = draggedPieceElement.width;
             const dh = draggedPieceElement.height;
             
             let targetX = clientX - dw / 2;
-            let targetY = clientY - dh / 2;
             
+            // 3: Смещение для мобилок
+            // Если тач, поднимаем фигуру выше пальца на 1.5 высоты фигуры, чтобы было видно
+            let targetY = isTouch ? (clientY - dh * 2.0) : (clientY - dh / 2);
+            
+            // Границы Canvas для магнита
             const minX = rect.left;
             const maxX = rect.right - dw;
 
+            // Магнитим к краям по X
             if (targetX < minX) targetX = minX;
             if (targetX > maxX) targetX = maxX;
             
             draggedPieceElement.style.left = targetX + 'px';
             draggedPieceElement.style.top = targetY + 'px';
             
+            // Проекция (куда упадет)
+            // Рассчитываем позицию относительно канваса
+            // Для Y используем координаты центра фигуры для точности
+            const centerX = targetX + dw / 2;
+            const centerY = targetY + dh / 2;
+
             const relX = Math.round((targetX - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
             const relY = Math.round((targetY - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
             
@@ -884,6 +910,7 @@
             const rect = canvas.getBoundingClientRect();
             const currentLeft = parseFloat(draggedPieceElement.style.left);
             const currentTop = parseFloat(draggedPieceElement.style.top);
+            
             const dropX = Math.round((currentLeft - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
             const dropY = Math.round((currentTop - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
             
@@ -892,7 +919,6 @@
             if (canPlacePiece(piece, dropY, dropX)) {
                 placePiece(piece, dropY, dropX);
                 playSound('drop');
-                // 6: Короткая вибрация при установке
                 vibrate(30);
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
@@ -970,30 +996,70 @@
             setTimeout(() => el.remove(), 800);
         }
 
+        // 1: Реалистичный Фейковый Топ
         function generateLeaderboard() {
             const names = ["Алексей", "Мария", "Иван", "Елена", "Дмитрий", "Ольга", "Сергей", "Анна", "Николай", "Татьяна"];
             const list = [];
+            
+            // 1 место: 120-140 млн
+            let topScore = 120000000 + Math.floor(Math.random() * 20000000);
+            
+            // Генерируем топ 5 с убыванием
             for(let i=0; i<5; i++) {
+                let currentScore;
+                if (i === 0) {
+                    currentScore = topScore;
+                } else if (i === 4) {
+                    // 5 место: около 2 млн
+                    currentScore = 2000000 + Math.floor(Math.random() * 500000);
+                } else {
+                    // Интерполяция между 1 и 5 местом
+                    let factor = i / 4; // 0.25, 0.5, 0.75
+                    // Просто сделаем резкий спад
+                    currentScore = Math.floor(topScore / Math.pow(3, i)); 
+                }
+
                 list.push({
                     rank: i+1,
                     name: names[i],
-                    score: (8000000 - i*1500000).toLocaleString()
+                    score: currentScore.toLocaleString('ru-RU')
                 });
             }
+
+            // 1: Формула места игрока
+            // 10000 игроков, каждые 800 очков +1 место
             let playerRank = 10000 - Math.floor(score / 800);
-            if (playerRank < 1) playerRank = 1;
-            const playerEntry = { rank: playerRank, name: "Вы", score: score, isMe: true };
+            if (playerRank < 1) playerRank = 1; // Не может быть выше 1
+            if (playerRank > 10000) playerRank = 10000;
+
+            const playerEntry = { rank: playerRank, name: "Вы", score: score.toLocaleString('ru-RU'), isMe: true };
             
             const container = document.getElementById('leaderboard-list');
             container.innerHTML = '';
             
-            [...list, playerEntry].forEach(item => {
+            // Показываем топ 5 + игрока
+            let displayList = [...list];
+            // Если игрок не попал в топ 5, добавляем его в конец
+            if (playerRank > 5) {
+                displayList.push({ rank: "...", name: "", score: "" }); // Разделитель
+                displayList.push(playerEntry);
+            } else {
+                // Если игрок в топе (теоретически), заменяем бота (упрощено)
+                 // В данной реализации просто покажем его отдельной строкой если он крут, или он просто видит топ ботов
+            }
+
+            displayList.forEach(item => {
                 const div = document.createElement('div');
                 div.className = `leaderboard-item ${item.isMe ? 'me' : ''}`;
-                div.innerHTML = `
-                    <span>#${item.rank} ${item.rank===1?'🏆':''} ${item.name}</span>
-                    <span>${item.score}</span>
-                `;
+                if (item.rank === "...") {
+                     div.innerHTML = `<span>...</span>`;
+                     div.style.border = "none";
+                } else {
+                    div.innerHTML = `
+                        <span>#${item.rank} ${item.rank===1?'🏆':''} ${item.name}</span>
+                        <span>${item.score}</span>
+                    `;
+                }
                 container.appendChild(div);
             });
         }
@@ -1036,7 +1102,7 @@
         
         document.getElementById('pause-btn').addEventListener('click', () => {
             isPaused = true;
-            tutorialRunning = false; // Остановить анимацию если она была
+            tutorialRunning = false; 
             document.getElementById('stat-games').textContent = stats.gamesPlayed;
             document.getElementById('stat-record').textContent = stats.record;
             document.getElementById('menu-modal').style.display = 'flex';
@@ -1060,16 +1126,15 @@
             isPaused = false;
         });
 
-        // 5: Анимированное обучение
+        // Обучение
         let tutorialRunning = false;
         let tutCanvas, tutCtx, tutGrid;
         let tutTimer = 0;
-        let tutState = 0; // 0: спавн, 1: падение, 2: ожидание, 3: удаление
+        let tutState = 0; 
 
         function initTutorial() {
             tutCanvas = document.getElementById('tutorial-canvas');
             tutCtx = tutCanvas.getContext('2d');
-            // Маленькая сетка 20x25
             tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0));
             tutorialRunning = true;
             tutState = 0;
@@ -1080,19 +1145,16 @@
         function updateTutorial() {
             if (!tutorialRunning) return;
 
-            // Рисуем фон
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
             
-            // Логика демо
             tutTimer++;
             const PIXEL_SIZE = 8;
 
             if (tutState === 0 && tutTimer > 20) {
-                // Спавн песка сверху
                 for(let y=0; y<5; y++) {
                     for(let x=5; x<15; x++) {
-                        tutGrid[y][x] = 2; // Зеленый
+                        tutGrid[y][x] = 2;
                     }
                 }
                 tutState = 1;
@@ -1100,7 +1162,6 @@
             }
             
             if (tutState === 1) {
-                // Физика
                 let moved = false;
                 for (let y = 38; y >= 0; y--) {
                     for (let x = 0; x < 25; x++) {
@@ -1121,25 +1182,23 @@
                     }
                 }
                 if (!moved && tutTimer > 60) {
-                    tutState = 2; // Все упало
+                    tutState = 2;
                     tutTimer = 0;
                 }
             }
 
             if (tutState === 2) {
-                // Рисуем "очистку" (мигание)
                 if (Math.floor(tutTimer / 10) % 2 === 0) {
                      tutCtx.globalAlpha = 0.5;
                 }
                 if (tutTimer > 60) {
-                    tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0)); // Очистить
+                    tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0)); 
                     tutState = 0;
                     tutTimer = 0;
                     tutCtx.globalAlpha = 1.0;
                 }
             }
 
-            // Отрисовка сетки
             for (let y = 0; y < 40; y++) {
                 for (let x = 0; x < 25; x++) {
                     if (tutGrid[y][x] !== 0) {
