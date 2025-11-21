@@ -5,20 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sand Blast Ultimate</title>
     <style>
-        /* Отключение выделения, скролла и контекстного меню */
+        /* Базовые настройки */
         * {
             box-sizing: border-box;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
             user-select: none;
             touch-action: none;
         }
 
         body {
-            /* 5: Градиент от темно-голубого сверху вниз и снизу вверх (центр темнее) */
+            /* Градиент фона: темно-голубой -> черный -> темно-голубой */
             background: linear-gradient(180deg, #0f2040 0%, #050505 40%, #050505 60%, #0f2040 100%);
             color: #e0e0e0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -31,36 +28,34 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
         }
 
-        /* Верхняя панель */
+        /* --- Верхняя панель (Шапка) --- */
         #top-bar {
-            width: 100%;
-            padding: 8px 10px;
+            background: transparent;
+            padding: 5px 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: rgba(31, 31, 46, 0.8); /* Полупрозрачность */
-            box-shadow: 0 2px 15px rgba(0,0,0,0.6);
+            justify-content: center;
             z-index: 10;
             flex-shrink: 0;
         }
 
-        /* 6: Адаптивный контейнер счета */
         #score-container {
             width: 100%;
-            max-width: 400px; /* Ограничиваем ширину */
             position: relative;
-            height: 28px;
+            height: 24px;
         }
         
         #score-bar-bg {
             width: 100%;
             height: 100%;
-            background-color: #0f3460;
-            border-radius: 14px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
             overflow: hidden;
-            border: 2px solid #333;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         #score-bar-fill {
@@ -68,7 +63,7 @@
             width: 0%;
             background: linear-gradient(90deg, #e94560, #ff6b6b);
             transition: width 0.3s ease-out;
-            box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+            box-shadow: 0 0 8px rgba(233, 69, 96, 0.4);
         }
 
         #score-text {
@@ -76,32 +71,28 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 800;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            text-shadow: 1px 1px 2px #000;
             white-space: nowrap;
             z-index: 2;
         }
 
-        /* Центральная часть с игрой */
+        /* --- Игровая область --- */
         #game-container-flex {
-            flex-grow: 1;
-            width: 100%;
+            flex-grow: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
-            padding: 5px;
+            padding: 2px;
         }
 
-        /* Игровое поле (Фон игры - черный) */
         #game-wrapper {
             position: relative;
             border: 2px solid #0f3460;
             border-radius: 8px;
             background-color: #000; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            /* Размеры задаются через JS */
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
 
         canvas#gameCanvas {
@@ -110,77 +101,43 @@
             cursor: crosshair;
         }
 
-        /* Нижняя панель */
+        /* --- Нижняя панель (Подвал) --- */
         #controls-area {
-            width: 100%;
-            /* 6: Не даем вылезать за рамки игрового поля на широких экранах */
-            max-width: 100%; 
+            background: transparent;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            padding: 8px;
-            background: rgba(31, 31, 46, 0.9);
-            border-top: 1px solid #333;
+            gap: 5px;
+            padding: 5px 0;
+            border-top: none;
             flex-shrink: 0;
-            padding-bottom: max(8px, env(safe-area-inset-bottom)); 
         }
-
-        /* Контейнер для кнопок и фигур центрируем по ширине канваса (сделаем через JS resize, но тут зададим ограничения) */
-        .controls-inner {
-            width: 100%;
-            max-width: 500px; /* Максимальная ширина интерфейса */
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        #pieces-container {
-            width: 100%;
-            height: 70px;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            background-color: transparent;
-            padding: 2px;
-        }
-
-        .piece-preview {
-            background-color: transparent;
-            transition: transform 0.1s;
-            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
-            /* Максимальный размер превью, чтобы не ломать верстку */
-            max-height: 100%;
-            max-width: 30%;
-        }
-        .piece-preview:active { transform: scale(0.95); }
 
         #buttons-row {
             display: flex;
             justify-content: space-between;
-            gap: 8px;
+            gap: 5px;
+            width: 100%;
         }
 
         .icon-btn {
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             color: white;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: bold;
-            padding: 10px 5px;
+            padding: 8px 2px;
             flex: 1;
             cursor: pointer;
-            transition: transform 0.1s, box-shadow 0.2s;
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 3px 0 rgba(0,0,0,0.3);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
             white-space: nowrap;
         }
         
         .icon-btn:active {
-            transform: translateY(3px);
+            transform: translateY(2px);
             box-shadow: none;
         }
 
@@ -190,16 +147,33 @@
 
         #magic-btn.active {
             background: linear-gradient(45deg, #ff00de, #00f7ff);
-            box-shadow: 0 0 20px #ff00de;
+            box-shadow: 0 0 15px #ff00de;
             animation: pulse 0.8s infinite alternate;
         }
 
         @keyframes pulse {
-            from { transform: scale(1); box-shadow: 0 0 10px #ff00de; }
-            to { transform: scale(1.05); box-shadow: 0 0 25px #ff00de; }
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
         }
 
-        /* Модальные окна */
+        #pieces-container {
+            width: 100%;
+            height: 60px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: transparent;
+        }
+
+        .piece-preview {
+            background-color: transparent;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            max-width: 30%; 
+            max-height: 100%;
+        }
+        .piece-preview:active { transform: scale(0.95); }
+
+        /* --- Модальные окна --- */
         .modal {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -208,10 +182,10 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 200; /* Поверх всего */
+            z-index: 200;
             padding: 10px;
             text-align: center;
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(5px);
         }
 
         .modal-content {
@@ -220,10 +194,10 @@
             border-radius: 20px;
             border: 2px solid #e94560;
             width: 90%;
-            max-width: 350px;
+            max-width: 320px;
             max-height: 90vh;
             overflow-y: auto;
-            box-shadow: 0 0 40px rgba(233, 69, 96, 0.3);
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
         }
 
         .modal h2 { color: #e94560; margin-top: 0; font-size: 1.8rem; margin-bottom: 15px;}
@@ -239,13 +213,8 @@
             border-radius: 12px;
             font-size: 1.1rem;
             cursor: pointer;
-            box-shadow: 0 4px 0 #081b33;
         }
-        .modal-btn:active { transform: translateY(4px); box-shadow: none; }
-        .modal-btn.primary { 
-            background: linear-gradient(45deg, #e94560, #ff6b6b);
-            box-shadow: 0 4px 0 #a12d40;
-        }
+        .modal-btn.primary { background: linear-gradient(45deg, #e94560, #ff6b6b); }
 
         .toggle-row {
             display: flex;
@@ -261,16 +230,16 @@
         .leaderboard-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px;
+            padding: 8px;
             border-bottom: 1px solid #333;
             font-size: 0.9rem;
         }
         .leaderboard-item.me {
             color: #00f7ff;
             font-weight: bold;
-            border: 2px solid #00f7ff;
-            border-radius: 8px;
-            background: rgba(0, 247, 255, 0.15);
+            border: 1px solid #00f7ff;
+            border-radius: 6px;
+            background: rgba(0, 247, 255, 0.1);
         }
 
         #dragged-piece {
@@ -323,7 +292,6 @@
         </div>
     </div>
 
-    <!-- 6: Контейнер с flex-grow для максимизации поля -->
     <div id="game-container-flex">
         <div id="game-wrapper">
             <canvas id="gameCanvas"></canvas>
@@ -331,17 +299,14 @@
     </div>
 
     <div id="controls-area">
-        <div class="controls-inner">
-            <div id="buttons-row">
-                <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
-                <button id="magic-btn" class="icon-btn">🪄 Магия</button>
-                <button id="rank-btn" class="icon-btn">🏆 Топ</button>
-            </div>
-            <div id="pieces-container"></div>
+        <div id="buttons-row">
+            <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
+            <button id="magic-btn" class="icon-btn">🪄 Магия</button>
+            <button id="rank-btn" class="icon-btn">🏆 Топ</button>
         </div>
+        <div id="pieces-container"></div>
     </div>
 
-    <!-- Меню -->
     <div id="menu-modal" class="modal">
         <div class="modal-content">
             <h2>Меню</h2>
@@ -354,7 +319,7 @@
                 <input type="checkbox" id="vibration-toggle" checked>
             </div>
             <hr style="border-color: #333; margin: 15px 0;">
-            <div style="text-align: center; margin-bottom: 15px; font-size: 1em;">
+            <div style="text-align: center; margin-bottom: 15px;">
                 <div style="margin-bottom: 5px;">Игр сыграно: <span id="stat-games" style="color: #00f7ff">0</span></div>
                 <div>Рекорд: <span id="stat-record" style="color: #e94560">0</span></div>
             </div>
@@ -364,7 +329,6 @@
         </div>
     </div>
 
-    <!-- Рейтинг -->
     <div id="rank-modal" class="modal">
         <div class="modal-content">
             <h2>🏆 Лидеры</h2>
@@ -373,18 +337,16 @@
         </div>
     </div>
 
-    <!-- Обучение -->
     <div id="tutorial-modal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-content">
             <h2>Как играть</h2>
             <canvas id="tutorial-canvas" width="200" height="250"></canvas>
             <p style="font-size: 0.9em; margin: 10px 0;">Перетащи фигуру -> Собери линию!</p>
-            <p style="font-size: 0.9em; color: #aaa">Собери 25,000 очков для розового цвета!</p>
+            <p style="font-size: 0.9em; color: #aaa">Розовый цвет открывается на 25,000!</p>
             <button class="modal-btn primary" id="close-tutorial-btn">Всё понятно!</button>
         </div>
     </div>
 
-    <!-- 2: Game Over с кнопкой -->
     <div id="gameover-modal" class="modal">
         <div class="modal-content">
             <h2 style="font-size: 2.2em">Проигрыш</h2>
@@ -404,6 +366,8 @@
         const statGamesSpan = document.getElementById('stat-games');
         const statRecordSpan = document.getElementById('stat-record');
         const gameWrapper = document.getElementById('game-wrapper');
+        const topBar = document.getElementById('top-bar');
+        const controlsArea = document.getElementById('controls-area');
 
         const sounds = {
             bg: document.getElementById('snd_bg'),
@@ -413,16 +377,15 @@
             magic: document.getElementById('snd_magic')
         };
 
-        const BLOCK_COLS = 15;
-        const BLOCK_ROWS = 25;
+        const MICRO_COLS = 80;
+        const MICRO_ROWS = 100;
+        const GAME_OVER_LINE_ROW = 20; 
+        
         let MICRO_SCALE = 6; 
-        let MICRO_COLS, MICRO_ROWS, MICRO_PIXEL_SIZE;
+        let MICRO_PIXEL_SIZE;
         
         const PHYSICS_ITERS_PER_FRAME = 3; 
         const CLEAR_ANIMATION_DURATION = 20;
-        
-        // 4: Линия смерти ниже
-        let GAME_OVER_LINE_ROW; // Будет рассчитан при инициализации
         
         const COLORS = { 
             1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33', 5: '#FF69B4'
@@ -452,6 +415,7 @@
         let clearAnimationTimer = 0;
         let isMagicActive = false;
         let physicsFrameParity = 0;
+        let gameLoopId = null; // Для контроля цикла анимации
 
         let settings = { sound: true, vibration: true };
         let stats = {
@@ -459,82 +423,97 @@
             record: parseInt(localStorage.getItem('sb_record') || '0')
         };
 
-        // 6: Улучшенная адаптация
         function resizeGame() {
-            const topBar = document.getElementById('top-bar');
-            const bottomBar = document.getElementById('controls-area');
-            
-            // Вычисляем доступное место для игры
-            const availableHeight = window.innerHeight - topBar.offsetHeight - bottomBar.offsetHeight - 10; // 10px отступ
-            const availableWidth = window.innerWidth - 10; // 10px отступ по бокам
+            const padding = 20; 
+            const uiHeight = 120; 
 
-            const aspectRatio = (BLOCK_COLS * MICRO_SCALE) / (BLOCK_ROWS * MICRO_SCALE);
-            
-            let displayHeight = availableHeight;
-            let displayWidth = displayHeight * aspectRatio;
+            const availableWidth = window.innerWidth - padding;
+            const availableHeight = window.innerHeight - uiHeight - padding;
 
-            // Если по ширине не влезает
-            if (displayWidth > availableWidth) {
-                displayWidth = availableWidth;
-                displayHeight = displayWidth / aspectRatio;
-            }
+            MICRO_PIXEL_SIZE = Math.min(
+                availableWidth / MICRO_COLS,
+                availableHeight / MICRO_ROWS
+            );
             
-            // Минимальные размеры
-            if (displayWidth < 150) displayWidth = 150;
-
-            MICRO_COLS = BLOCK_COLS * MICRO_SCALE;
-            MICRO_ROWS = BLOCK_ROWS * MICRO_SCALE;
-            MICRO_PIXEL_SIZE = displayWidth / MICRO_COLS;
-            
-            // 4: Красная линия (опускаем ниже, например, на 4 полных блока)
-            GAME_OVER_LINE_ROW = MICRO_SCALE * 4; 
+            if (MICRO_PIXEL_SIZE < 2) MICRO_PIXEL_SIZE = 2;
 
             canvas.width = Math.floor(MICRO_COLS * MICRO_PIXEL_SIZE);
             canvas.height = Math.floor(MICRO_ROWS * MICRO_PIXEL_SIZE);
             
-            // Применяем размеры к обертке
             gameWrapper.style.width = canvas.width + 'px';
             gameWrapper.style.height = canvas.height + 'px';
+
+            topBar.style.width = canvas.width + 'px';
+            controlsArea.style.width = canvas.width + 'px';
 
             if (!grid || grid.length === 0) {
                  grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             }
-            draw();
         }
 
-        window.addEventListener('resize', resizeGame);
+        window.addEventListener('resize', () => {
+            resizeGame();
+            draw();
+        });
 
         function init() {
+            // Остановка предыдущего цикла, если он есть
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+
             resizeGame();
+            
+            // Полный сброс сетки
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
+            
             score = 0;
             gameOver = false;
             isPaused = false;
             isMagicActive = false;
+            isClearingLines = false;
+            pixelsToAnimate = [];
+            isBoardStable = true;
+            clearAnimationTimer = 0;
+            
+            // Сброс Drag'n'Drop
+            isDragging = false;
+            selectedPieceIndex = -1;
+            if (draggedPieceElement) {
+                draggedPieceElement.remove();
+                draggedPieceElement = null;
+            }
+            
             updateMagicState();
             updateScoreUI();
             generateNewPieces();
             
-            // Скрываем модальные окна
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             
+            // Принудительная отрисовка пустого поля
+            draw();
+
             document.body.addEventListener('click', () => {
                 if(settings.sound && sounds.bg.paused) playSound('bg');
             }, {once: true});
             
-            if (!gameLoop.isRunning) {
-                gameLoop.isRunning = true;
-                requestAnimationFrame(gameLoop);
-            }
+            // Запуск цикла
+            gameLoop();
         }
 
         function gameLoop() {
-            if (isPaused) {
-                if(tutorialRunning) updateTutorial();
-                requestAnimationFrame(gameLoop);
+            // Если игра окончена, цикл останавливаем (не запрашиваем кадр)
+            if (gameOver) {
+                gameLoopId = null;
                 return;
             }
-            if (gameOver) return;
+
+            if (isPaused) {
+                if(tutorialRunning) updateTutorial();
+                gameLoopId = requestAnimationFrame(gameLoop);
+                return;
+            }
 
             if (!isClearingLines) {
                 for (let i = 0; i < PHYSICS_ITERS_PER_FRAME; i++) {
@@ -555,9 +534,9 @@
 
             draw();
             if (!isClearingLines) checkGameOver();
-            requestAnimationFrame(gameLoop);
+            
+            gameLoopId = requestAnimationFrame(gameLoop);
         }
-        gameLoop.isRunning = false;
 
         function updatePhysics() {
             let movedAny = false;
@@ -653,7 +632,6 @@
         }
 
         function checkGameOver() {
-            // Проверяем пересечение с линией смерти
             if (isBoardStable) {
                 for (let x = 0; x < MICRO_COLS; x++) {
                     if (grid[GAME_OVER_LINE_ROW][x] !== 0) {
@@ -664,12 +642,14 @@
             }
         }
 
-        // 2: Окно при проигрыше
         function endGame() {
-            gameOver = true;
+            gameOver = true; // Это остановит следующий кадр в gameLoop
             stats.gamesPlayed++;
-            if (score > stats.record) stats.record = score;
+            if (score > stats.record) {
+                stats.record = score;
+            }
             saveStats();
+            
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
             vibrate([200, 100, 200]);
@@ -771,18 +751,17 @@
                 }
             }
 
-            // 4: Яркая красная линия
             if (GAME_OVER_LINE_ROW) {
                 ctx.beginPath();
                 ctx.strokeStyle = '#FF0000';
-                ctx.lineWidth = 3;
-                ctx.shadowBlur = 10;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 8;
                 ctx.shadowColor = "red";
                 const yPos = GAME_OVER_LINE_ROW * MICRO_PIXEL_SIZE;
                 ctx.moveTo(0, yPos);
                 ctx.lineTo(canvas.width, yPos);
                 ctx.stroke();
-                ctx.shadowBlur = 0; // Сброс
+                ctx.shadowBlur = 0;
             }
         }
 
@@ -793,7 +772,7 @@
                 preview.className = 'piece-preview';
                 preview.dataset.index = index;
                 
-                const blockSize = 16;
+                const blockSize = 14; 
                 const w = piece.shape[0].length * blockSize;
                 const h = piece.shape.length * blockSize;
                 preview.width = w;
@@ -869,28 +848,17 @@
             const dh = draggedPieceElement.height;
             
             let targetX = clientX - dw / 2;
-            
-            // 3: Смещение для мобилок
-            // Если тач, поднимаем фигуру выше пальца на 1.5 высоты фигуры, чтобы было видно
             let targetY = isTouch ? (clientY - dh * 2.0) : (clientY - dh / 2);
             
-            // Границы Canvas для магнита
             const minX = rect.left;
             const maxX = rect.right - dw;
 
-            // Магнитим к краям по X
             if (targetX < minX) targetX = minX;
             if (targetX > maxX) targetX = maxX;
             
             draggedPieceElement.style.left = targetX + 'px';
             draggedPieceElement.style.top = targetY + 'px';
             
-            // Проекция (куда упадет)
-            // Рассчитываем позицию относительно канваса
-            // Для Y используем координаты центра фигуры для точности
-            const centerX = targetX + dw / 2;
-            const centerY = targetY + dh / 2;
-
             const relX = Math.round((targetX - rect.left) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
             const relY = Math.round((targetY - rect.top) / (MICRO_PIXEL_SIZE * MICRO_SCALE));
             
@@ -996,26 +964,20 @@
             setTimeout(() => el.remove(), 800);
         }
 
-        // 1: Реалистичный Фейковый Топ
         function generateLeaderboard() {
             const names = ["Алексей", "Мария", "Иван", "Елена", "Дмитрий", "Ольга", "Сергей", "Анна", "Николай", "Татьяна"];
             const list = [];
             
-            // 1 место: 120-140 млн
             let topScore = 120000000 + Math.floor(Math.random() * 20000000);
             
-            // Генерируем топ 5 с убыванием
             for(let i=0; i<5; i++) {
                 let currentScore;
                 if (i === 0) {
                     currentScore = topScore;
                 } else if (i === 4) {
-                    // 5 место: около 2 млн
                     currentScore = 2000000 + Math.floor(Math.random() * 500000);
                 } else {
-                    // Интерполяция между 1 и 5 местом
-                    let factor = i / 4; // 0.25, 0.5, 0.75
-                    // Просто сделаем резкий спад
+                    let factor = i / 4; 
                     currentScore = Math.floor(topScore / Math.pow(3, i)); 
                 }
 
@@ -1026,26 +988,20 @@
                 });
             }
 
-            // 1: Формула места игрока
-            // 10000 игроков, каждые 800 очков +1 место
-            let playerRank = 10000 - Math.floor(score / 800);
-            if (playerRank < 1) playerRank = 1; // Не может быть выше 1
+            const displayScore = Math.max(score, stats.record);
+            let playerRank = 10000 - Math.floor(displayScore / 800);
+            if (playerRank < 1) playerRank = 1;
             if (playerRank > 10000) playerRank = 10000;
 
-            const playerEntry = { rank: playerRank, name: "Вы", score: score.toLocaleString('ru-RU'), isMe: true };
+            const playerEntry = { rank: playerRank, name: "Вы", score: displayScore.toLocaleString('ru-RU'), isMe: true };
             
             const container = document.getElementById('leaderboard-list');
             container.innerHTML = '';
             
-            // Показываем топ 5 + игрока
             let displayList = [...list];
-            // Если игрок не попал в топ 5, добавляем его в конец
             if (playerRank > 5) {
-                displayList.push({ rank: "...", name: "", score: "" }); // Разделитель
+                displayList.push({ rank: "...", name: "", score: "" }); 
                 displayList.push(playerEntry);
-            } else {
-                // Если игрок в топе (теоретически), заменяем бота (упрощено)
-                 // В данной реализации просто покажем его отдельной строкой если он крут, или он просто видит топ ботов
             }
 
             displayList.forEach(item => {
@@ -1126,90 +1082,90 @@
             isPaused = false;
         });
 
-        // Обучение
+        // 3: Улучшенная анимация обучения
         let tutorialRunning = false;
-        let tutCanvas, tutCtx, tutGrid;
+        let tutCanvas, tutCtx;
+        let tutStep = 0;
         let tutTimer = 0;
-        let tutState = 0; 
 
         function initTutorial() {
             tutCanvas = document.getElementById('tutorial-canvas');
             tutCtx = tutCanvas.getContext('2d');
-            tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0));
             tutorialRunning = true;
-            tutState = 0;
+            tutStep = 0; // 0: рука появляется, 1: движение, 2: падение, 3: исчезновение
             tutTimer = 0;
             requestAnimationFrame(updateTutorial);
         }
 
         function updateTutorial() {
             if (!tutorialRunning) return;
-
+            
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
-            
+
             tutTimer++;
-            const PIXEL_SIZE = 8;
-
-            if (tutState === 0 && tutTimer > 20) {
-                for(let y=0; y<5; y++) {
-                    for(let x=5; x<15; x++) {
-                        tutGrid[y][x] = 2;
-                    }
-                }
-                tutState = 1;
-                tutTimer = 0;
-            }
             
-            if (tutState === 1) {
-                let moved = false;
-                for (let y = 38; y >= 0; y--) {
-                    for (let x = 0; x < 25; x++) {
-                        if (tutGrid[y][x] !== 0) {
-                             if (tutGrid[y+1] && tutGrid[y+1][x] === 0) {
-                                 tutGrid[y+1][x] = tutGrid[y][x];
-                                 tutGrid[y][x] = 0;
-                                 moved = true;
-                             } else if (tutGrid[y+1]) {
-                                 const dir = Math.random() < 0.5 ? 1 : -1;
-                                 if (x+dir>=0 && x+dir<25 && tutGrid[y+1][x+dir] === 0) {
-                                     tutGrid[y+1][x+dir] = tutGrid[y][x];
-                                     tutGrid[y][x] = 0;
-                                     moved = true;
-                                 }
-                             }
-                        }
-                    }
-                }
-                if (!moved && tutTimer > 60) {
-                    tutState = 2;
-                    tutTimer = 0;
-                }
+            const handX_start = 50;
+            const handX_end = 100;
+            const handY = 50;
+            const blockY_start = 50;
+            const blockY_end = 180; 
+            
+            if (tutStep < 3 || (tutStep === 3 && Math.floor(tutTimer/5)%2===0)) {
+                tutCtx.fillStyle = '#333';
+                tutCtx.fillRect(20, 220, 160, 5);
             }
 
-            if (tutState === 2) {
+            if (tutStep === 0) {
+                drawHandWithBlock(handX_start, handY);
+                if (tutTimer > 30) { tutStep = 1; tutTimer = 0; }
+            } 
+            else if (tutStep === 1) {
+                const progress = Math.min(tutTimer / 30, 1);
+                const curX = handX_start + (handX_end - handX_start) * progress;
+                drawHandWithBlock(curX, handY);
+                if (tutTimer > 40) { tutStep = 2; tutTimer = 0; }
+            }
+            else if (tutStep === 2) {
+                const progress = Math.min(tutTimer / 20, 1);
+                const curY = blockY_start + (blockY_end - blockY_start) * progress;
+                
+                if (progress < 1) {
+                    drawBlock(handX_end, curY);
+                } else {
+                    tutCtx.fillStyle = '#33FF33';
+                    tutCtx.fillRect(handX_end, blockY_end, 40, 40);
+                    const spread = Math.min((tutTimer - 20) * 2, 80);
+                    if (spread > 0) {
+                         tutCtx.fillRect(handX_end - spread/2, blockY_end + 30, 40 + spread, 10);
+                    }
+                }
+                
+                if (tutTimer > 60) { tutStep = 3; tutTimer = 0; }
+            }
+            else if (tutStep === 3) {
                 if (Math.floor(tutTimer / 10) % 2 === 0) {
-                     tutCtx.globalAlpha = 0.5;
+                    tutCtx.fillStyle = '#33FF33';
+                    tutCtx.fillRect(20, blockY_end + 30, 160, 10);
                 }
-                if (tutTimer > 60) {
-                    tutGrid = Array.from({ length: 40 }, () => Array(25).fill(0)); 
-                    tutState = 0;
-                    tutTimer = 0;
-                    tutCtx.globalAlpha = 1.0;
-                }
+                if (tutTimer > 60) { tutStep = 0; tutTimer = 0; }
             }
-
-            for (let y = 0; y < 40; y++) {
-                for (let x = 0; x < 25; x++) {
-                    if (tutGrid[y][x] !== 0) {
-                        tutCtx.fillStyle = '#33FF33';
-                        tutCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-                    }
-                }
-            }
-            tutCtx.globalAlpha = 1.0;
 
             if (tutorialRunning) requestAnimationFrame(updateTutorial);
+        }
+        
+        function drawHandWithBlock(x, y) {
+            tutCtx.font = "30px Arial";
+            tutCtx.fillStyle = "white";
+            tutCtx.fillText("👆", x + 10, y + 50);
+            drawBlock(x, y);
+        }
+        
+        function drawBlock(x, y) {
+            tutCtx.fillStyle = '#33FF33';
+            tutCtx.fillRect(x, y, 20, 20);
+            tutCtx.strokeStyle = 'white';
+            tutCtx.strokeRect(x, y, 20, 20);
         }
 
         document.getElementById('tutorial-btn').addEventListener('click', () => {
