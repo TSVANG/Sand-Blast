@@ -446,24 +446,53 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- СОХРАНЕНИЕ ---
+        // --- СОХРАНЕНИЕ И ЗАГРУЗКА ---
+
+        // Синхронизация статистики через ВК (принцип из Wordle: отдельный ключ)
+        async function syncStats() {
+            try {
+                const data = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_stats'] });
+                if (data.keys && data.keys[0].value) {
+                    const cloudStats = JSON.parse(data.keys[0].value);
+                    // Сливаем локальную и облачную статистику по принципу "где больше"
+                    stats.gamesPlayed = Math.max(stats.gamesPlayed, cloudStats.gamesPlayed || 0);
+                    stats.record = Math.max(stats.record, cloudStats.record || 0);
+                }
+                // Сохраняем объединенный результат обратно
+                await vkBridge.send('VKWebAppStorageSet', { key: 'sb_stats', value: JSON.stringify(stats) });
+            } catch (e) {
+                console.error("Sync stats error", e);
+            }
+        }
+
         async function saveProgress() {
-            if (gameOver) return;
-            const saveData = { grid, score, availablePieces, stats, timestamp: Date.now() };
-            const dataStr = JSON.stringify(saveData);
-            localStorage.setItem('sb_save_v1', dataStr);
-            try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_v1', value: dataStr }); } catch(e) {}
+            // Сохраняем состояние игры
+            if (!gameOver) {
+                const saveData = { grid, score, availablePieces, timestamp: Date.now() };
+                const dataStr = JSON.stringify(saveData);
+                localStorage.setItem('sb_save_game', dataStr);
+                try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_game', value: dataStr }); } catch(e) {}
+            }
+            
+            // Сохраняем статистику отдельно
+            localStorage.setItem('sb_stats_local', JSON.stringify(stats));
+            syncStats(); // Синхронизируем с облаком
         }
 
         async function loadProgress() {
+            // 1. Загружаем статистику
+            const localStats = localStorage.getItem('sb_stats_local');
+            if (localStats) stats = JSON.parse(localStats);
+            await syncStats(); // Подтягиваем из облака
+            
+            // 2. Загружаем игру
             let dataStr = null;
             try {
-                // 2) СИНХРОНИЗАЦИЯ: Загружаем из облака ВК
-                const res = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_save_v1'] });
+                const res = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_save_game'] });
                 if (res.keys && res.keys[0].value) dataStr = res.keys[0].value;
             } catch(e) {}
             
-            if (!dataStr) dataStr = localStorage.getItem('sb_save_v1');
+            if (!dataStr) dataStr = localStorage.getItem('sb_save_game');
             
             if (dataStr) {
                 try { return JSON.parse(dataStr); } catch(e) { return null; }
@@ -472,11 +501,9 @@
         }
 
         async function clearProgress() {
-            // Сохраняем "пустую" игру, но с сохраненной статистикой
-            const cleanData = { grid: [], score: 0, availablePieces: [], stats: stats, timestamp: Date.now() };
-            const dataStr = JSON.stringify(cleanData);
-            localStorage.setItem('sb_save_v1', dataStr);
-            try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_v1', value: dataStr }); } catch(e){}
+            // Чистим только состояние игры, статистику не трогаем
+            localStorage.removeItem('sb_save_game');
+            try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_game', value: '' }); } catch(e){}
         }
 
         document.addEventListener("visibilitychange", () => {
@@ -535,10 +562,6 @@
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
             const savedData = await loadProgress();
 
-            if (savedData && savedData.stats) {
-                stats = savedData.stats;
-            }
-
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
                 init();
@@ -568,7 +591,7 @@
             grid = data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
-            stats = data.stats || stats;
+            // stats уже загружены в loadProgress
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
@@ -581,6 +604,7 @@
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
+            clearProgress(); // Чистим сохраненную игру
             resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             score = 0; gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false;
@@ -653,7 +677,7 @@
             isClearingLines = true; pixelsToAnimate = pixels;
             clearAnimationTimer = CLEAR_ANIMATION_DURATION;
             playSound('combo');
-            vibrate('success'); // 3) Вибрация очистки
+            vibrate('success'); 
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
             showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
@@ -710,10 +734,12 @@
             gameOver = true;
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
-            saveProgress();
+            
+            saveProgress(); // Сохраняем статистику и проигрыш
+            
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
-            vibrate('error'); // Вибрация проигрыша
+            vibrate('error');
             showInterstitialAd();
         }
 
@@ -819,7 +845,7 @@
             if (!e.target.classList.contains('piece-preview')) return;
             e.preventDefault();
             playSound('pickup');
-            vibrate('light'); // 3) Легкая вибрация
+            vibrate('light'); 
 
             selectedPieceIndex = parseInt(e.target.dataset.index);
             const piece = availablePieces[selectedPieceIndex];
@@ -893,7 +919,7 @@
             if (canPlacePiece(piece, dropY, dropX)) {
                 placePiece(piece, dropY, dropX);
                 playSound('drop');
-                vibrate('medium'); // 3) Вибрация броска
+                vibrate('medium'); 
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
@@ -973,22 +999,22 @@
 
         function playSound(name) { if (settings.sound && sounds[name]) { sounds[name].currentTime = 0; sounds[name].play().catch(e => {}); } }
         
-        // 3) Короткая вибрация (исправлено)
+        // ВИБРАЦИЯ (укороченная)
         function vibrate(type) {
             if (!settings.vibration) return;
             
             if (vkBridge.supports("VKWebAppTapticImpactOccurred")) {
-                // Для VK на iOS используем Taptic Engine
+                // Для VK на iOS всегда используем самый легкий стиль для краткости
                 if (type === 'success') vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "success" });
                 else if (type === 'error') vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "error" });
-                else vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }); // Всегда light для краткости
+                else vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }); 
             } else if (navigator.vibrate) {
-                // Для Android уменьшены значения в 2 раза
-                let pattern = 10; // light (взятие)
-                if (type === 'medium') pattern = 15; // бросок
-                if (type === 'heavy') pattern = 25; // магия
-                if (type === 'success') pattern = [25, 25, 25]; // линия
-                if (type === 'error') pattern = [50, 25, 50]; // проигрыш
+                // Для Android уменьшили значения в 2 раза от предыдущих
+                let pattern = 5; // light (было 10)
+                if (type === 'medium') pattern = 8; // было 15
+                if (type === 'heavy') pattern = 15; // было 25
+                if (type === 'success') pattern = [15, 15, 15]; 
+                if (type === 'error') pattern = [30, 15, 30]; 
                 navigator.vibrate(pattern);
             }
         }
@@ -1016,16 +1042,15 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
-        // --- ОБУЧЕНИЕ (1) ---
+        // --- ОБУЧЕНИЕ ---
         let tutorialRunning = false;
-        let tutorialLoopId = null; // 1) ID для контроля цикла обучения
+        let tutorialLoopId = null;
         let tutCanvas, tutCtx;
         let tutStep = 0;
         let tutTimer = 0;
         let tutGrid = []; 
 
         function initTutorial() {
-            // 1) Сброс предыдущего цикла, если он был
             if (tutorialLoopId) cancelAnimationFrame(tutorialLoopId);
             
             tutCanvas = document.getElementById('tutorial-canvas');
@@ -1033,7 +1058,7 @@
             tutorialRunning = true;
             tutStep = 0; tutTimer = 0;
             tutGrid = Array.from({length: 35}, () => Array(30).fill(0));
-            updateTutorial(); // Запуск
+            updateTutorial();
         }
 
         function updateTutorial() {
@@ -1042,8 +1067,7 @@
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
 
-            // 1) Замедление обучения. Таймер растет медленно и линейно
-            tutTimer += 0.15; 
+            tutTimer += 0.1; // Равномерная скорость
             
             const handX_start = 40; const handX_end = 100;
             const handY = 30; const blockY_end = 200;
@@ -1065,10 +1089,8 @@
                 }
             }
 
-            // Текст обучения
             const textEl = document.getElementById('tutorial-text');
 
-            // Логика шагов
             if (tutStep === 0) { 
                 textEl.textContent = "Возьми фигуру";
                 drawHandWithBlock(handX_start, handY);
@@ -1114,7 +1136,6 @@
                 }
             }
 
-            // Отрисовка песка
             for (let y = 0; y < 35; y++) {
                 for (let x = 0; x < 30; x++) {
                     if (tutGrid[y][x] !== 0) {
