@@ -95,12 +95,19 @@
             border-radius: 8px;
             background-color: #000; 
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            transition: box-shadow 0.3s, border-color 0.3s;
+        }
+        
+        /* Эффект активной магии для поля */
+        #game-wrapper.magic-active {
+            border-color: #d900ff;
+            box-shadow: 0 0 30px #d900ff, inset 0 0 20px #d900ff;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewport="0 0 24 24" fill="none" stroke="%23d900ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>') 12 12, crosshair;
         }
 
         canvas#gameCanvas {
             display: block;
             border-radius: 4px;
-            cursor: crosshair;
         }
 
         #controls-area {
@@ -139,6 +146,7 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
             white-space: nowrap;
+            transition: all 0.2s;
         }
         
         .icon-btn:active {
@@ -150,10 +158,19 @@
         #magic-btn { background: linear-gradient(to bottom, #d900ff, #9d00b8); }
         #rank-btn { background: linear-gradient(to bottom, #ffaa00, #cc8800); }
 
+        /* Более явная индикация магии */
         #magic-btn.active {
-            background: linear-gradient(45deg, #ff00de, #00f7ff);
-            box-shadow: 0 0 15px #ff00de;
-            animation: pulse 0.8s infinite alternate;
+            background: linear-gradient(45deg, #ff00de, #7a00ff);
+            box-shadow: 0 0 25px #ff00de;
+            animation: magicPulse 0.6s infinite alternate;
+            border: 2px solid #fff;
+            transform: scale(1.05);
+            z-index: 20;
+        }
+        
+        @keyframes magicPulse {
+            from { box-shadow: 0 0 10px #ff00de; }
+            to { box-shadow: 0 0 30px #ff00de, 0 0 10px #fff; }
         }
         
         .ad-icon {
@@ -165,11 +182,6 @@
             font-size: 0.7em;
             margin-left: 5px;
             vertical-align: middle;
-        }
-
-        @keyframes pulse {
-            from { transform: scale(1); }
-            to { transform: scale(1.05); }
         }
 
         #pieces-container {
@@ -431,7 +443,18 @@
         const PHYSICS_ITERS_PER_FRAME = 3; 
         const CLEAR_ANIMATION_DURATION = 20;
         
-        const COLORS = { 1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33', 5: '#FF69B4' };
+        // 1) Новые цвета
+        const COLORS = { 
+            1: '#FF3333', // Красный
+            2: '#33FF33', // Зеленый
+            3: '#3333FF', // Синий
+            4: '#FFFF33', // Желтый
+            5: '#33FFFF', // Светло-голубой
+            6: '#FF9933', // Светло-оранжевый
+            7: '#9933FF', // Фиолетовый
+            8: '#FF69B4'  // Розовый (Призовой)
+        };
+        
         const PIECES = [
             { shape: [[1, 1], [1, 1]] }, { shape: [[1, 1, 1, 1]] }, { shape: [[0, 1, 0], [1, 1, 1]] }, 
             { shape: [[1, 1, 0], [0, 1, 1]] }, { shape: [[0, 1, 1], [1, 1, 0]] }, 
@@ -447,45 +470,34 @@
         let stats = { gamesPlayed: 0, record: 0 };
 
         // --- СОХРАНЕНИЕ И ЗАГРУЗКА ---
-
-        // Синхронизация статистики через ВК (принцип из Wordle: отдельный ключ)
         async function syncStats() {
             try {
                 const data = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_stats'] });
                 if (data.keys && data.keys[0].value) {
                     const cloudStats = JSON.parse(data.keys[0].value);
-                    // Сливаем локальную и облачную статистику по принципу "где больше"
                     stats.gamesPlayed = Math.max(stats.gamesPlayed, cloudStats.gamesPlayed || 0);
                     stats.record = Math.max(stats.record, cloudStats.record || 0);
                 }
-                // Сохраняем объединенный результат обратно
                 await vkBridge.send('VKWebAppStorageSet', { key: 'sb_stats', value: JSON.stringify(stats) });
-            } catch (e) {
-                console.error("Sync stats error", e);
-            }
+            } catch (e) { console.error("Sync stats error", e); }
         }
 
         async function saveProgress() {
-            // Сохраняем состояние игры
             if (!gameOver) {
                 const saveData = { grid, score, availablePieces, timestamp: Date.now() };
                 const dataStr = JSON.stringify(saveData);
                 localStorage.setItem('sb_save_game', dataStr);
                 try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_game', value: dataStr }); } catch(e) {}
             }
-            
-            // Сохраняем статистику отдельно
             localStorage.setItem('sb_stats_local', JSON.stringify(stats));
-            syncStats(); // Синхронизируем с облаком
+            syncStats(); 
         }
 
         async function loadProgress() {
-            // 1. Загружаем статистику
             const localStats = localStorage.getItem('sb_stats_local');
             if (localStats) stats = JSON.parse(localStats);
-            await syncStats(); // Подтягиваем из облака
+            await syncStats(); 
             
-            // 2. Загружаем игру
             let dataStr = null;
             try {
                 const res = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_save_game'] });
@@ -501,7 +513,6 @@
         }
 
         async function clearProgress() {
-            // Чистим только состояние игры, статистику не трогаем
             localStorage.removeItem('sb_save_game');
             try { await vkBridge.send('VKWebAppStorageSet', { key: 'sb_save_game', value: '' }); } catch(e){}
         }
@@ -562,6 +573,8 @@
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
             const savedData = await loadProgress();
 
+            if (savedData && savedData.stats) stats = savedData.stats;
+
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
                 init();
@@ -591,7 +604,7 @@
             grid = data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
-            // stats уже загружены в loadProgress
+            stats = data.stats || stats;
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
@@ -604,7 +617,7 @@
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
-            clearProgress(); // Чистим сохраненную игру
+            clearProgress(); 
             resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             score = 0; gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false;
@@ -735,7 +748,7 @@
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
             
-            saveProgress(); // Сохраняем статистику и проигрыш
+            saveProgress(); 
             
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
@@ -747,19 +760,44 @@
             availablePieces = [];
             for (let i = 0; i < 3; i++) {
                 const shape = PIECES[Math.floor(Math.random() * PIECES.length)].shape;
-                let color = (score >= 25000 && Math.random() > 0.9) ? 5 : Math.floor(Math.random() * 4) + 1;
+                // 1) Новые цвета в рандоме
+                let color;
+                if (score >= 25000 && Math.random() > 0.9) {
+                    color = 8; // Розовый редкий
+                } else {
+                    color = Math.floor(Math.random() * 7) + 1; // 1-7 обычные
+                }
                 availablePieces.push({ shape, color });
             }
             drawPieceSelectors();
         }
 
         function activateMagic() {
-            if (isMagicActive) { isMagicActive = false; updateMagicState(); }
-            else { showRewardedAd(() => { isMagicActive = true; showPopupText("Удалить цвет!", canvas.width/2, canvas.height/3); updateMagicState(); }); }
+            if (isMagicActive) { 
+                isMagicActive = false; 
+                updateMagicState(); 
+            } else { 
+                showRewardedAd(() => { 
+                    isMagicActive = true; 
+                    showPopupText("НАЖМИ НА ЦВЕТ!", canvas.width/2, canvas.height/3); 
+                    updateMagicState(); 
+                }); 
+            }
         }
+        
+        // 3) Визуализация магии
         function updateMagicState() {
-            if (isMagicActive) { magicBtn.classList.add('active'); canvas.style.cursor = 'crosshair'; }
-            else { magicBtn.classList.remove('active'); canvas.style.cursor = 'default'; }
+            if (isMagicActive) { 
+                magicBtn.classList.add('active'); 
+                magicBtn.textContent = "✨ ВЫБЕРИ ЦВЕТ ✨";
+                canvas.style.cursor = 'crosshair'; 
+                gameWrapper.classList.add('magic-active');
+            } else { 
+                magicBtn.classList.remove('active'); 
+                magicBtn.innerHTML = '🪄 Магия <span class="ad-icon">AD</span>';
+                canvas.style.cursor = 'default'; 
+                gameWrapper.classList.remove('magic-active');
+            }
         }
 
         function handleCanvasClick(e) {
@@ -999,20 +1037,16 @@
 
         function playSound(name) { if (settings.sound && sounds[name]) { sounds[name].currentTime = 0; sounds[name].play().catch(e => {}); } }
         
-        // ВИБРАЦИЯ (укороченная)
         function vibrate(type) {
             if (!settings.vibration) return;
-            
             if (vkBridge.supports("VKWebAppTapticImpactOccurred")) {
-                // Для VK на iOS всегда используем самый легкий стиль для краткости
                 if (type === 'success') vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "success" });
                 else if (type === 'error') vkBridge.send("VKWebAppTapticNotificationOccurred", { type: "error" });
                 else vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }); 
             } else if (navigator.vibrate) {
-                // Для Android уменьшили значения в 2 раза от предыдущих
-                let pattern = 5; // light (было 10)
-                if (type === 'medium') pattern = 8; // было 15
-                if (type === 'heavy') pattern = 15; // было 25
+                let pattern = 5; 
+                if (type === 'medium') pattern = 8; 
+                if (type === 'heavy') pattern = 15; 
                 if (type === 'success') pattern = [15, 15, 15]; 
                 if (type === 'error') pattern = [30, 15, 30]; 
                 navigator.vibrate(pattern);
@@ -1042,7 +1076,7 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
-        // --- ОБУЧЕНИЕ ---
+        // --- 2) ОБУЧЕНИЕ С ДЕТАЛИЗАЦИЕЙ ---
         let tutorialRunning = false;
         let tutorialLoopId = null;
         let tutCanvas, tutCtx;
@@ -1067,13 +1101,13 @@
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
 
-            tutTimer += 0.1; // Равномерная скорость
+            tutTimer += 0.15; // Фиксированная скорость, не ускоряется
             
             const handX_start = 40; const handX_end = 100;
             const handY = 30; const blockY_end = 200;
             const T_SCALE = 8; 
 
-            // Физика
+            // Физика (упрощенная для обучения)
             for (let y = 33; y >= 0; y--) {
                 for (let x = 0; x < 30; x++) {
                     if (tutGrid[y][x] !== 0) {
@@ -1093,58 +1127,68 @@
 
             if (tutStep === 0) { 
                 textEl.textContent = "Возьми фигуру";
-                drawHandWithBlock(handX_start, handY);
+                drawHandWithBlock(handX_start, handY, false);
                 if (tutTimer > 30) { tutStep = 1; tutTimer = 0; }
             }
             else if (tutStep === 1) { 
-                textEl.textContent = "Перетащи";
+                textEl.textContent = "Перетащи на поле";
                 const progress = Math.min(tutTimer / 40, 1);
                 const curX = handX_start + (handX_end - handX_start) * progress;
-                drawHandWithBlock(curX, handY);
+                drawHandWithBlock(curX, handY, false);
                 if (tutTimer > 50) { tutStep = 2; tutTimer = 0; }
             }
             else if (tutStep === 2) { 
-                textEl.textContent = "Отпусти";
+                textEl.textContent = "Отпусти - она рассыплется!";
                 const progress = Math.min(tutTimer / 30, 1);
                 const curY = handY + 20 + (blockY_end - (handY + 20)) * progress;
+                
                 if (progress < 1) {
-                    drawBlock(handX_end, curY);
+                    // Падает целый блок
+                    drawBlock(handX_end, curY, true);
                 } else {
+                    // Превращаем блок в песок (детализация)
+                    // Блок 3x3 клетки по 8px = 24x24 пикселя
                     for(let r=0; r<3; r++) for(let c=0; c<3; c++) {
                         let gx = Math.floor(handX_end/T_SCALE) + c;
                         let gy = Math.floor(blockY_end/T_SCALE) + r;
-                        if(gy<35 && gx<30) tutGrid[gy][gx] = 1;
+                        if(gy<35 && gx<30) tutGrid[gy][gx] = 1; // 1 - цвет блока
                     }
                     tutStep = 3; tutTimer = 0;
                 }
             }
             else if (tutStep === 3) { 
-                textEl.textContent = "Собери линию";
-                if (tutTimer > 60) { 
-                    for(let x=2; x<28; x++) tutGrid[30][x] = 2;
+                textEl.textContent = "Собери линию одного цвета";
+                if (tutTimer > 80) { 
+                    // Спавним линию для демонстрации
+                    for(let x=2; x<28; x++) tutGrid[30][x] = 2; // 2 - другой цвет
                     tutStep = 4; tutTimer = 0; 
                 }
             }
             else if (tutStep === 4) { 
-                if (Math.floor(tutTimer / 15) % 2 === 0) { 
+                if (Math.floor(tutTimer / 10) % 2 === 0) { 
+                     // Мигание линии
                      tutCtx.fillStyle = 'rgba(255,255,255,0.5)';
                      tutCtx.fillRect(16, 30 * T_SCALE, 26 * T_SCALE, T_SCALE);
                 }
-                if (tutTimer > 90) { 
+                if (tutTimer > 60) { 
+                    // Очистка
                     tutGrid = Array.from({length: 35}, () => Array(30).fill(0));
                     tutStep = 0; tutTimer = 0; 
                 }
             }
 
+            // Отрисовка песка в сетке
             for (let y = 0; y < 35; y++) {
                 for (let x = 0; x < 30; x++) {
                     if (tutGrid[y][x] !== 0) {
-                        tutCtx.fillStyle = tutGrid[y][x] === 1 ? '#33FF33' : '#3333FF';
+                        // 1 - Зеленый (падающий), 2 - Красный (линия)
+                        tutCtx.fillStyle = tutGrid[y][x] === 1 ? '#33FF33' : '#FF3333';
                         tutCtx.fillRect(x * T_SCALE, y * T_SCALE, T_SCALE, T_SCALE);
                     }
                 }
             }
             
+            // Пол
             tutCtx.fillStyle = '#555';
             tutCtx.fillRect(0, 31 * T_SCALE, 30 * T_SCALE, 5);
 
@@ -1153,13 +1197,34 @@
             }
         }
 
-        function drawHandWithBlock(x, y) {
-            tutCtx.font = "30px Arial"; tutCtx.fillStyle = "white"; tutCtx.fillText("👆", x + 10, y + 50);
-            drawBlock(x, y);
+        function drawHandWithBlock(x, y, isSand) {
+            tutCtx.font = "30px Arial"; 
+            tutCtx.fillStyle = "white"; 
+            tutCtx.fillText("👆", x + 10, y + 50);
+            drawBlock(x, y, isSand);
         }
-        function drawBlock(x, y) {
-            tutCtx.fillStyle = '#33FF33'; tutCtx.fillRect(x, y, 24, 24);
-            tutCtx.strokeStyle = 'white'; tutCtx.strokeRect(x, y, 24, 24);
+        
+        // Рисуем блок с "зернистостью"
+        function drawBlock(x, y, isSand) {
+            const size = 24; 
+            const pixelSize = 8;
+            
+            if (!isSand) {
+                 // Цельный блок с обводкой
+                 tutCtx.fillStyle = '#33FF33'; 
+                 tutCtx.fillRect(x, y, size, size);
+                 tutCtx.strokeStyle = 'white'; 
+                 tutCtx.lineWidth = 2;
+                 tutCtx.strokeRect(x, y, size, size);
+            } else {
+                 // Блок, состоящий из квадратиков (для падения)
+                 tutCtx.fillStyle = '#33FF33';
+                 for(let i=0; i<3; i++) {
+                    for(let j=0; j<3; j++) {
+                        tutCtx.fillRect(x + j*pixelSize, y + i*pixelSize, pixelSize-1, pixelSize-1);
+                    }
+                 }
+            }
         }
 
         bootGame();
