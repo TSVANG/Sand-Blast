@@ -30,15 +30,6 @@
             justify-content: center;
         }
 
-        /* Иконки SVG */
-        .icon-svg {
-            width: 24px;
-            height: 24px;
-            fill: currentColor;
-            vertical-align: middle;
-            margin-right: 5px;
-        }
-
         #top-bar {
             background: transparent;
             padding: 5px 0;
@@ -134,53 +125,50 @@
         #buttons-row {
             display: flex;
             justify-content: space-between;
-            gap: 8px;
-            width: 95%;
+            gap: 6px;
+            width: 98%;
             margin: 0 auto;
         }
 
         .icon-btn {
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             color: white;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: bold;
-            padding: 12px 5px;
+            padding: 12px 2px;
             flex: 1;
             cursor: pointer;
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+            box-shadow: 0 3px 0 rgba(0,0,0,0.3);
             text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
             white-space: nowrap;
             transition: all 0.1s;
-            text-transform: uppercase;
         }
         
         .icon-btn:active {
-            transform: translateY(4px);
+            transform: translateY(3px);
             box-shadow: none;
         }
 
         /* Цвета кнопок */
-        #menu-btn { background: linear-gradient(to bottom, #4a4a5e, #2b2b3d); }
+        #pause-btn { background: linear-gradient(to bottom, #4a4a5e, #2b2b3d); }
         #magic-btn { background: linear-gradient(to bottom, #d900ff, #9d00b8); }
         #rank-btn { background: linear-gradient(to bottom, #ffaa00, #cc8800); }
         #games-btn { background: linear-gradient(to bottom, #00c6ff, #0072ff); }
 
         #magic-btn.active {
             background: linear-gradient(45deg, #ff00de, #7a00ff);
-            box-shadow: 0 0 25px #ff00de;
+            box-shadow: 0 0 15px #ff00de;
             animation: magicPulse 0.6s infinite alternate;
-            border: 2px solid #fff;
-            transform: scale(1.05);
-            z-index: 20;
+            border: 1px solid #fff;
         }
         
         @keyframes magicPulse {
             from { box-shadow: 0 0 10px #ff00de; }
-            to { box-shadow: 0 0 30px #ff00de, 0 0 10px #fff; }
+            to { box-shadow: 0 0 25px #ff00de, 0 0 10px #fff; }
         }
         
         .ad-icon {
@@ -304,6 +292,9 @@
             cursor: pointer;
             transition: transform 0.1s;
             border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .game-card:active { transform: scale(0.95); }
         .game-img {
@@ -315,9 +306,10 @@
             object-fit: cover;
         }
         .game-title {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: bold;
             color: #fff;
+            text-align: center;
         }
 
         #dragged-piece {
@@ -372,14 +364,6 @@
     <audio id="snd_combo" preload="auto"> <source src="combo.mp3" type="audio/mpeg"> </audio>
     <audio id="snd_magic" preload="auto"> <source src="magic.mp3" type="audio/mpeg"> </audio>
 
-    <!-- SVG Иконки (спрятаны) -->
-    <svg style="display: none;">
-        <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></symbol>
-        <symbol id="icon-magic" viewBox="0 0 24 24"><path d="M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 13l2.5 1.4L17 15.8 19.5 17.2 22 15.8 20.6 13.3zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zM11.2 15.5l-5.3 5.3a1.5 1.5 0 0 1-2.1 0 1.5 1.5 0 0 1 0-2.1l5.3-5.3a.9.9 0 0 1 1.3 0l.8.8a.9.9 0 0 1 0 1.3zM19 9l-2.2-2.2a1 1 0 0 0-1.4 0l-7.7 7.7a1.6 1.6 0 0 0 0 2.3l2.2 2.2a1.6 1.6 0 0 0 2.3 0l7.7-7.7a1 1 0 0 0 0-1.4z"/></symbol>
-        <symbol id="icon-cup" viewBox="0 0 24 24"><path d="M17 2H7C5.9 2 5 2.9 5 4v2c0 3.3 2.7 6 6 6s6-2.7 6-6V4c0-1.1-.9-2-2-2zm-5 6c-1.7 0-3-1.3-3-3V4h6v2c0 1.7-1.3 3-3 3zM19 4h2v2c0 2.8-2.2 5-5 5v2c0 1.7-1.3 3-3 3s-3-1.3-3-3v-2c-2.8 0-5-2.2-5-5V4h2v2c0 1.7 1.3 3 3 3s3-1.3 3-3V4zm-7 16h10v2H5v-2z"/></symbol>
-        <symbol id="icon-gamepad" viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5zm4-3c-.8 0-1.5-.7-1.5-1.5S18.7 9 19.5 9s1.5.7 1.5 1.5-.7 1.5-1.5 1.5z"/></symbol>
-    </svg>
-
     <div id="top-bar">
         <div id="score-container">
             <div id="score-bar-bg">
@@ -397,12 +381,11 @@
 
     <div id="controls-area">
         <div id="buttons-row">
-            <!-- 6) Иконки вместо эмодзи -->
-            <button id="menu-btn" class="icon-btn"><svg class="icon-svg"><use xlink:href="#icon-pause"/></svg></button>
-            <button id="magic-btn" class="icon-btn"><svg class="icon-svg"><use xlink:href="#icon-magic"/></svg> <span class="ad-icon">AD</span></button>
-            <button id="rank-btn" class="icon-btn"><svg class="icon-svg"><use xlink:href="#icon-cup"/></svg></button>
-            <!-- 3) Кнопка каталога -->
-            <button id="games-btn" class="icon-btn"><svg class="icon-svg"><use xlink:href="#icon-gamepad"/></svg></button>
+            <!-- Кнопки с эмодзи -->
+            <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
+            <button id="magic-btn" class="icon-btn">🪄 Магия <span class="ad-icon">AD</span></button>
+            <button id="rank-btn" class="icon-btn">🏆 Топ</button>
+            <button id="games-btn" class="icon-btn">🎮 Игры</button>
         </div>
         <div id="pieces-container"></div>
     </div>
@@ -448,7 +431,7 @@
         </div>
     </div>
 
-    <!-- 3) Каталог Игр -->
+    <!-- Каталог Игр -->
     <div id="games-modal" class="modal">
         <div class="modal-content">
             <h2>🎮 Мои Игры</h2>
@@ -459,7 +442,7 @@
         </div>
     </div>
 
-    <!-- 2) Обучение с детальной анимацией -->
+    <!-- Обучение с детальной анимацией -->
     <div id="tutorial-modal" class="modal">
         <div class="modal-content" style="max-width: 450px;">
             <h2>Как играть</h2>
@@ -481,16 +464,13 @@
         const vkBridge = window.vkBridge;
         vkBridge.send('VKWebAppInit').catch(console.log);
 
-        // --- 3, 5) КАТАЛОГ ИГР ---
-        // Заполните этот массив вашими данными
-        // Картинки лучше всего JPG или PNG, 512x512px.
-        // Положите их в корень папки проекта.
+        // --- КАТАЛОГ ИГР (Обновлен) ---
         const GAMES_CATALOG = [
-            { id: 123456, name: "Игра 1", img: "game1.jpg" }, 
-            { id: 234567, name: "Игра 2", img: "game2.jpg" },
-            { id: 345678, name: "Игра 3", img: "game3.jpg" },
-            { id: 456789, name: "Игра 4", img: "game4.jpg" },
-            { id: 567890, name: "Игра 5", img: "game5.jpg" }
+            { id: 54057569, name: "Wordle", img: "Wordle.jpg" }, 
+            { id: 54053077, name: "Виселица", img: "viselitsa.jpg" },
+            { id: 54051783, name: "Numberzilla", img: "Numberzilla.jpg" },
+            { id: 54040298, name: "Судоку", img: "Sudoku.jpg" },
+            { id: 53993726, name: "Кибер-Змей 3000", img: "Zmei.jpg" }
         ];
 
         const canvas = document.getElementById('gameCanvas');
@@ -528,17 +508,10 @@
         const PHYSICS_ITERS_PER_FRAME = 3; 
         const CLEAR_ANIMATION_DURATION = 20;
         
-        // 1) Новые цвета и пороги
+        // 1) Цвета
         const COLORS = { 
-            1: '#FF3333', // Красный (Старт)
-            2: '#33FF33', // Зеленый (Старт)
-            3: '#3333FF', // Синий (Старт)
-            4: '#FFFF33', // Желтый (Старт)
-            // Новые:
-            5: '#FF69B4', // Розовый (> 25k)
-            6: '#33FFFF', // Светло-голубой (> 50k)
-            7: '#FF9933', // Светло-оранжевый (> 75k)
-            8: '#9933FF'  // Фиолетовый (> 100k)
+            1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33',
+            5: '#FF69B4', 6: '#33FFFF', 7: '#FF9933', 8: '#9933FF'
         };
         
         const PIECES = [
@@ -555,15 +528,12 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- 4) СИНХРОНИЗАЦИЯ (ОБЛАКО ВК) ---
-        // Используем единый ключ для всего, чтобы при смене устройства подтягивалось всё
+        // --- СИНХРОНИЗАЦИЯ ---
         async function syncCloud(saveData = null) {
             try {
                 if (saveData) {
-                    // Сохранение
                     await vkBridge.send('VKWebAppStorageSet', { key: 'sb_full_save', value: JSON.stringify(saveData) });
                 } else {
-                    // Загрузка
                     const data = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_full_save'] });
                     if (data.keys && data.keys[0].value) {
                         return JSON.parse(data.keys[0].value);
@@ -574,21 +544,17 @@
         }
 
         async function saveProgress() {
-            // Формируем полный сейв
             const saveData = { 
-                grid: gameOver ? [] : grid, // Если проиграл, поле чистое
+                grid: gameOver ? [] : grid, 
                 score: gameOver ? 0 : score,
                 availablePieces, 
                 stats, 
                 timestamp: Date.now() 
             };
-            // Локально
             localStorage.setItem('sb_full_save', JSON.stringify(saveData));
-            // В облако
             await syncCloud(saveData);
         }
 
-        // --- РЕКЛАМА ---
         function showBannerAd() {
             if (vkBridge.supports("VKWebAppShowBannerAd")) {
                 vkBridge.send("VKWebAppShowBannerAd", { banner_location: "bottom" })
@@ -609,7 +575,6 @@
             } else onSuccess();
         }
 
-        // --- АДАПТАЦИЯ ---
         function resizeGame() {
             const topH = topBar.offsetHeight;
             const bottomH = controlsArea.offsetHeight + bannerHeight; 
@@ -632,20 +597,17 @@
 
         window.addEventListener('resize', () => { resizeGame(); draw(); });
 
-        // --- СТАРТ ---
         async function bootGame() {
             resizeGame();
             showBannerAd();
             
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
             
-            // Проверяем облако и локалку, выбираем свежее
             const cloudData = await syncCloud();
             const localDataStr = localStorage.getItem('sb_full_save');
             let localData = localDataStr ? JSON.parse(localDataStr) : null;
             
             let finalData = localData;
-            // Если в облаке новее, берем оттуда
             if (cloudData && (!localData || cloudData.timestamp > localData.timestamp)) {
                 finalData = cloudData;
             }
@@ -834,12 +796,11 @@
             availablePieces = [];
             for (let i = 0; i < 3; i++) {
                 const shape = PIECES[Math.floor(Math.random() * PIECES.length)].shape;
-                // 1) Логика цветов по уровням
-                let colorOptions = [1, 2, 3, 4]; // Базовые
-                if (score >= 25000) colorOptions.push(5); // Розовый
-                if (score >= 50000) colorOptions.push(6); // Голубой
-                if (score >= 75000) colorOptions.push(7); // Оранжевый
-                if (score >= 100000) colorOptions.push(8); // Фиолетовый
+                let colorOptions = [1, 2, 3, 4]; 
+                if (score >= 25000) colorOptions.push(5); 
+                if (score >= 50000) colorOptions.push(6); 
+                if (score >= 75000) colorOptions.push(7); 
+                if (score >= 100000) colorOptions.push(8); 
                 
                 const color = colorOptions[Math.floor(Math.random() * colorOptions.length)];
                 availablePieces.push({ shape, color });
@@ -860,15 +821,14 @@
             }
         }
         
-        // 3) Явное выделение магии
         function updateMagicState() {
             if (isMagicActive) { 
                 magicBtn.classList.add('active'); 
-                magicBtn.innerHTML = '<svg class="icon-svg"><use xlink:href="#icon-magic"/></svg> ВЫБЕРИ ЦВЕТ';
+                magicBtn.innerHTML = '✨ ВЫБЕРИ ЦВЕТ';
                 gameWrapper.classList.add('magic-active');
             } else { 
                 magicBtn.classList.remove('active'); 
-                magicBtn.innerHTML = '<svg class="icon-svg"><use xlink:href="#icon-magic"/></svg> <span class="ad-icon">AD</span>';
+                magicBtn.innerHTML = '🪄 Магия <span class="ad-icon">AD</span>';
                 gameWrapper.classList.remove('magic-active');
             }
         }
@@ -1131,15 +1091,23 @@
 
         magicBtn.addEventListener('click', activateMagic);
         canvas.addEventListener('click', handleCanvasClick);
-        document.getElementById('pause-btn').addEventListener('click', () => { isPaused = true; tutorialRunning = false; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
-        document.getElementById('resume-btn').addEventListener('click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
-        document.getElementById('restart-menu-btn').addEventListener('click', init);
-        document.getElementById('restart-btn').addEventListener('click', init);
-        document.getElementById('rank-btn').addEventListener('click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
-        document.getElementById('close-rank-btn').addEventListener('click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
         
-        // 3) Логика каталога
-        document.getElementById('games-btn').addEventListener('click', () => {
+        // Safe Event Listeners
+        function safeAddListener(id, event, handler) {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener(event, handler);
+            else console.warn('Element not found:', id);
+        }
+
+        safeAddListener('pause-btn', 'click', () => { isPaused = true; tutorialRunning = false; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
+        safeAddListener('resume-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
+        safeAddListener('restart-menu-btn', 'click', init);
+        safeAddListener('restart-btn', 'click', init);
+        safeAddListener('rank-btn', 'click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
+        safeAddListener('close-rank-btn', 'click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
+        
+        // Каталог
+        safeAddListener('games-btn', 'click', () => {
             isPaused = true;
             const list = document.getElementById('games-list');
             list.innerHTML = '';
@@ -1152,15 +1120,15 @@
             });
             document.getElementById('games-modal').style.display = 'flex';
         });
-        document.getElementById('close-games-btn').addEventListener('click', () => {
+        safeAddListener('close-games-btn', 'click', () => {
             document.getElementById('games-modal').style.display = 'none';
             isPaused = false;
         });
 
-        document.getElementById('tutorial-btn').addEventListener('click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; initTutorial(); });
-        document.getElementById('close-tutorial-btn').addEventListener('click', () => { document.getElementById('tutorial-modal').style.display = 'none'; if (!localStorage.getItem('sb_tutorial_shown')) { localStorage.setItem('sb_tutorial_shown', 'true'); init(); } else { isPaused = false; } tutorialRunning = false; });
-        document.getElementById('sound-toggle').addEventListener('change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
-        document.getElementById('vibration-toggle').addEventListener('change', (e) => { settings.vibration = e.target.checked; });
+        safeAddListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; initTutorial(); });
+        safeAddListener('close-tutorial-btn', 'click', () => { document.getElementById('tutorial-modal').style.display = 'none'; if (!localStorage.getItem('sb_tutorial_shown')) { localStorage.setItem('sb_tutorial_shown', 'true'); init(); } else { isPaused = false; } tutorialRunning = false; });
+        safeAddListener('sound-toggle', 'change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
+        safeAddListener('vibration-toggle', 'change', (e) => { settings.vibration = e.target.checked; });
 
         piecesContainer.addEventListener('mousedown', handleDragStart);
         piecesContainer.addEventListener('touchstart', handleDragStart, { passive: false });
@@ -1169,14 +1137,12 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
-        // --- 2) НОВОЕ ДЕТАЛЬНОЕ ОБУЧЕНИЕ ---
+        // --- НОВОЕ ОБУЧЕНИЕ ---
         let tutorialRunning = false;
         let tutorialLoopId = null;
         let tutCanvas, tutCtx;
         let tutStep = 0;
         let tutTimer = 0;
-        
-        // Сетка для обучения 
         let tutGrid = []; 
         const TUT_ROWS = 35;
         const TUT_COLS = 30;
@@ -1189,7 +1155,6 @@
             tutorialRunning = true;
             tutStep = 0; 
             tutTimer = 0;
-            // Очищаем сетку обучения
             tutGrid = Array.from({length: TUT_ROWS}, () => Array(TUT_COLS).fill(0));
             updateTutorial();
         }
@@ -1197,30 +1162,25 @@
         function updateTutorial() {
             if (!tutorialRunning) return;
             
-            // Очистка
             tutCtx.fillStyle = '#000';
             tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
 
-            // Таймер (фиксированный шаг)
-            tutTimer += 0.5;
+            tutTimer += 0.15;
             
             const handX_start = 40; 
             const handX_end = 100;
             const handY = 40; 
-            const blockY_end = 220; // Куда падает
-            const T_SCALE = 8; // Размер пикселя
+            const blockY_end = 220; 
+            const T_SCALE = 8; 
 
-            // --- ФИЗИКА ПЕСКА (внутри обучения) ---
-            // Простой алгоритм осыпания для tutGrid
+            // Физика песка
             for (let y = TUT_ROWS - 2; y >= 0; y--) {
                 for (let x = 0; x < TUT_COLS; x++) {
                     if (tutGrid[y][x] !== 0) {
-                        // Пытаемся упасть вниз
                         if (tutGrid[y+1][x] === 0) {
                             tutGrid[y+1][x] = tutGrid[y][x];
                             tutGrid[y][x] = 0;
                         } 
-                        // Или скатиться
                         else {
                             const dir = Math.random() > 0.5 ? 1 : -1;
                             if (x + dir >= 0 && x + dir < TUT_COLS && tutGrid[y+1][x+dir] === 0) {
@@ -1232,18 +1192,15 @@
                 }
             }
 
-            // --- СЦЕНАРИЙ ---
             const textEl = document.getElementById('tutorial-text');
 
             if (tutStep === 0) { 
                 textEl.textContent = "Возьми фигуру";
-                // Рисуем руку над начальной позицией
                 drawHandWithBlock(handX_start, handY, false);
                 if (tutTimer > 40) { tutStep = 1; tutTimer = 0; }
             }
             else if (tutStep === 1) { 
                 textEl.textContent = "Перетащи на поле";
-                // Рука движется к центру
                 const progress = Math.min(tutTimer / 60, 1);
                 const curX = handX_start + (handX_end - handX_start) * progress;
                 drawHandWithBlock(curX, handY, false);
@@ -1251,23 +1208,18 @@
             }
             else if (tutStep === 2) { 
                 textEl.textContent = "Отпусти - она рассыплется!";
-                // Блок падает
                 const progress = Math.min(tutTimer / 40, 1);
                 const curY = handY + 25 + (blockY_end - (handY + 25)) * progress;
                 
                 if (progress < 1) {
-                    // Падает как целое
                     drawBlock(handX_end, curY, false);
                 } else {
-                    // "Взрыв" в песок: переносим блок в сетку tutGrid
-                    // Рисуем блок 4x4 клетки по 8px (32x32)
                     const startGx = Math.floor(handX_end / T_SCALE);
                     const startGy = Math.floor(blockY_end / T_SCALE);
-                    
                     for(let r=0; r<4; r++) {
                         for(let c=0; c<4; c++) {
                             if(startGy+r < TUT_ROWS && startGx+c < TUT_COLS) {
-                                tutGrid[startGy+r][startGx+c] = 1; // 1 = зеленый
+                                tutGrid[startGy+r][startGx+c] = 1; 
                             }
                         }
                     }
@@ -1276,40 +1228,32 @@
             }
             else if (tutStep === 3) { 
                 textEl.textContent = "Собери линию одного цвета";
-                // Ждем, пока песок осядет (таймер), потом спавним линию
                 if (tutTimer > 100) { 
-                    // Спавним линию внизу (цвет 2 = красный)
                     for(let x=0; x<TUT_COLS; x++) tutGrid[TUT_ROWS-1][x] = 2;
                     tutStep = 4; tutTimer = 0; 
                 }
             }
             else if (tutStep === 4) { 
-                // Мигание и очистка
                 if (Math.floor(tutTimer / 10) % 2 === 0) { 
-                     // Рисуем белую полосу поверх линии
                      tutCtx.fillStyle = 'rgba(255,255,255,0.8)';
                      tutCtx.fillRect(0, (TUT_ROWS-1) * T_SCALE, TUT_COLS * T_SCALE, T_SCALE);
                 }
                 if (tutTimer > 60) { 
-                    // Полная очистка сетки
                     tutGrid = Array.from({length: TUT_ROWS}, () => Array(TUT_COLS).fill(0));
                     tutStep = 0; tutTimer = 0; 
                 }
             }
 
-            // Отрисовка содержимого tutGrid
             for (let y = 0; y < TUT_ROWS; y++) {
                 for (let x = 0; x < TUT_COLS; x++) {
                     const val = tutGrid[y][x];
                     if (val !== 0) {
-                        // 1 - Зеленый (наш блок), 2 - Красный (линия)
                         tutCtx.fillStyle = val === 1 ? '#33FF33' : '#FF3333';
                         tutCtx.fillRect(x * T_SCALE, y * T_SCALE, T_SCALE, T_SCALE);
                     }
                 }
             }
             
-            // Рисуем "пол"
             tutCtx.fillStyle = '#555';
             tutCtx.fillRect(0, TUT_ROWS * T_SCALE, TUT_COLS * T_SCALE, 10);
 
@@ -1319,30 +1263,21 @@
         }
 
         function drawHandWithBlock(x, y, isSand) {
-            // Рука (текст/эмодзи)
             tutCtx.font = "40px Arial"; 
             tutCtx.fillStyle = "white"; 
             tutCtx.fillText("👆", x + 15, y + 60);
-            // Блок под пальцем
             drawBlock(x, y, isSand);
         }
         
-        // Рисуем детализированный блок
         function drawBlock(x, y, isSand) {
             const pixelSize = 8;
-            const gridSize = 4; // 4x4 микропикселя
-            
+            const gridSize = 4; 
             tutCtx.fillStyle = '#33FF33';
-            
-            // Рисуем попиксельно, чтобы было похоже на песок
             for(let i=0; i<gridSize; i++) {
                 for(let j=0; j<gridSize; j++) {
-                    // Небольшой зазор для вида "песчинок"
                     tutCtx.fillRect(x + j*pixelSize, y + i*pixelSize, pixelSize-0.5, pixelSize-0.5);
                 }
             }
-            
-            // Обводка для цельности, пока летит
             if (!isSand) {
                  tutCtx.strokeStyle = 'white'; 
                  tutCtx.lineWidth = 1;
