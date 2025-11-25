@@ -153,8 +153,7 @@
             box-shadow: none;
         }
 
-        /* Цвета кнопок */
-        #pause-btn { background: linear-gradient(to bottom, #4a4a5e, #2b2b3d); }
+        #menu-btn { background: linear-gradient(to bottom, #4a4a5e, #2b2b3d); }
         #magic-btn { background: linear-gradient(to bottom, #d900ff, #9d00b8); }
         #rank-btn { background: linear-gradient(to bottom, #ffaa00, #cc8800); }
         #games-btn { background: linear-gradient(to bottom, #00c6ff, #0072ff); }
@@ -334,30 +333,24 @@
             from { opacity: 1; transform: translateY(0) scale(1); }
             to { opacity: 0; transform: translateY(-60px) scale(1.2); }
         }
-
-        #tutorial-canvas {
-            border: 2px solid #444;
-            border-radius: 8px;
-            background: #000;
-            margin: 10px auto;
-            display: block;
-            max-width: 100%;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
         
-        #tutorial-text {
-            font-size: 1.1rem;
+        /* Стили для текстового обучения */
+        .tutorial-step {
+            margin-bottom: 15px;
+            text-align: left;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .tutorial-step strong {
             color: #00f7ff;
-            margin: 10px 0;
-            min-height: 1.5em;
-            font-weight: bold;
-            text-shadow: 0 0 5px rgba(0, 247, 255, 0.5);
+            display: block;
+            margin-bottom: 5px;
         }
     </style>
 </head>
 <body>
 
-    <!-- Звуки -->
     <audio id="snd_bg" loop preload="auto"> <source src="bg_music.mp3" type="audio/mpeg"> </audio>
     <audio id="snd_pickup" preload="auto"> <source src="pickup.mp3" type="audio/mpeg"> </audio>
     <audio id="snd_drop" preload="auto"> <source src="drop.mp3" type="audio/mpeg"> </audio>
@@ -381,7 +374,6 @@
 
     <div id="controls-area">
         <div id="buttons-row">
-            <!-- Кнопки с эмодзи -->
             <button id="pause-btn" class="icon-btn">⏸️ Меню</button>
             <button id="magic-btn" class="icon-btn">🪄 Магия <span class="ad-icon">AD</span></button>
             <button id="rank-btn" class="icon-btn">🏆 Топ</button>
@@ -435,19 +427,27 @@
     <div id="games-modal" class="modal">
         <div class="modal-content">
             <h2>🎮 Мои Игры</h2>
-            <div id="games-list" class="games-grid">
-                <!-- JS заполнит это -->
-            </div>
+            <div id="games-list" class="games-grid"></div>
             <button class="modal-btn primary" id="close-games-btn">Закрыть</button>
         </div>
     </div>
 
-    <!-- Обучение с детальной анимацией -->
+    <!-- Обучение (текстовое) -->
     <div id="tutorial-modal" class="modal">
-        <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-content">
             <h2>Как играть</h2>
-            <canvas id="tutorial-canvas" width="300" height="300"></canvas>
-            <div id="tutorial-text">Загрузка...</div>
+            <div class="tutorial-step">
+                <strong>1. Перетаскивай</strong>
+                Бери фигуры снизу и перетаскивай их на игровое поле.
+            </div>
+            <div class="tutorial-step">
+                <strong>2. Соединяй</strong>
+                Фигуры рассыпаются в песок. Соедини один цвет от левого края до правого, чтобы очистить линию.
+            </div>
+            <div class="tutorial-step">
+                <strong>3. Магия</strong>
+                Нажми на кнопку "Магия", чтобы удалить любой цвет с поля.
+            </div>
             <button class="modal-btn primary" id="close-tutorial-btn">Всё понятно!</button>
         </div>
     </div>
@@ -461,10 +461,11 @@
     </div>
 
     <script>
+        // Инициализация VK
         const vkBridge = window.vkBridge;
         vkBridge.send('VKWebAppInit').catch(console.log);
 
-        // --- КАТАЛОГ ИГР (Обновлен) ---
+        // --- КАТАЛОГ ИГР ---
         const GAMES_CATALOG = [
             { id: 54057569, name: "Wordle", img: "Wordle.jpg" }, 
             { id: 54053077, name: "Виселица", img: "viselitsa.jpg" },
@@ -485,7 +486,6 @@
         const gameWrapper = document.getElementById('game-wrapper');
         const topBar = document.getElementById('top-bar');
         const controlsArea = document.getElementById('controls-area');
-        const tutorialTextDiv = document.getElementById('tutorial-text');
 
         const sounds = {
             bg: document.getElementById('snd_bg'),
@@ -508,7 +508,6 @@
         const PHYSICS_ITERS_PER_FRAME = 3; 
         const CLEAR_ANIMATION_DURATION = 20;
         
-        // 1) Цвета
         const COLORS = { 
             1: '#FF3333', 2: '#33FF33', 3: '#3333FF', 4: '#FFFF33',
             5: '#FF69B4', 6: '#33FFFF', 7: '#FF9933', 8: '#9933FF'
@@ -532,9 +531,12 @@
         async function syncCloud(saveData = null) {
             try {
                 if (saveData) {
-                    await vkBridge.send('VKWebAppStorageSet', { key: 'sb_full_save', value: JSON.stringify(saveData) });
+                    await vkBridge.send('VKWebAppStorageSet', { 
+                        key: 'sb_state', 
+                        value: JSON.stringify(saveData) 
+                    });
                 } else {
-                    const data = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_full_save'] });
+                    const data = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_state'] });
                     if (data.keys && data.keys[0].value) {
                         return JSON.parse(data.keys[0].value);
                     }
@@ -543,16 +545,30 @@
             return null;
         }
 
+        async function syncStats(newStats = null) {
+            try {
+                if (newStats) {
+                     await vkBridge.send('VKWebAppStorageSet', { key: 'sb_stats', value: JSON.stringify(newStats) });
+                } else {
+                    const data = await vkBridge.send('VKWebAppStorageGet', { keys: ['sb_stats'] });
+                    if (data.keys && data.keys[0].value) {
+                        const cloudStats = JSON.parse(data.keys[0].value);
+                        stats.gamesPlayed = Math.max(stats.gamesPlayed, cloudStats.gamesPlayed || 0);
+                        stats.record = Math.max(stats.record, cloudStats.record || 0);
+                    }
+                }
+            } catch(e) { console.error("Stats sync error", e); }
+        }
+
         async function saveProgress() {
-            const saveData = { 
-                grid: gameOver ? [] : grid, 
-                score: gameOver ? 0 : score,
-                availablePieces, 
-                stats, 
-                timestamp: Date.now() 
-            };
-            localStorage.setItem('sb_full_save', JSON.stringify(saveData));
-            await syncCloud(saveData);
+            if (!gameOver) {
+                const saveData = { 
+                    grid, score, availablePieces, 
+                    timestamp: Date.now() 
+                };
+                await syncCloud(saveData);
+            }
+            await syncStats(stats);
         }
 
         function showBannerAd() {
@@ -600,29 +616,20 @@
         async function bootGame() {
             resizeGame();
             showBannerAd();
-            
-            const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
-            
-            const cloudData = await syncCloud();
-            const localDataStr = localStorage.getItem('sb_full_save');
-            let localData = localDataStr ? JSON.parse(localDataStr) : null;
-            
-            let finalData = localData;
-            if (cloudData && (!localData || cloudData.timestamp > localData.timestamp)) {
-                finalData = cloudData;
-            }
+            await syncStats();
 
-            if (finalData && finalData.stats) stats = finalData.stats;
+            const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
+            const cloudData = await syncCloud();
 
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
                 init();
-                startTutorialDirectly();
-            } else if (finalData && finalData.score > 0 && finalData.grid && finalData.grid.length > 0) {
+                document.getElementById('tutorial-modal').style.display = 'flex';
+            } else if (cloudData && cloudData.score > 0 && cloudData.grid && cloudData.grid.length > 0) {
                 document.getElementById('welcome-modal').style.display = 'flex';
                 document.getElementById('welcome-continue-btn').onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
-                    restoreGame(finalData);
+                    restoreGame(cloudData);
                 };
                 document.getElementById('welcome-new-btn').onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
@@ -633,17 +640,11 @@
             }
         }
 
-        function startTutorialDirectly() {
-            document.getElementById('tutorial-modal').style.display = 'flex';
-            initTutorial();
-        }
-
         function restoreGame(data) {
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             grid = data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
-            stats = data.stats || stats;
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
@@ -656,6 +657,9 @@
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
+            // Очищаем сохранение игры в облаке при новой игре
+            vkBridge.send('VKWebAppStorageSet', { key: 'sb_state', value: '' }).catch(()=>{});
+            
             resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
             score = 0; gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false;
@@ -668,13 +672,11 @@
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             draw();
             gameLoop();
-            saveProgress(); 
         }
 
         function gameLoop() {
             if (gameOver) { gameLoopId = null; return; }
             if (isPaused) {
-                if(tutorialRunning) updateTutorial();
                 gameLoopId = requestAnimationFrame(gameLoop);
                 return;
             }
@@ -785,7 +787,9 @@
             gameOver = true;
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
+            
             saveProgress(); 
+            
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
             vibrate('error');
@@ -1099,7 +1103,7 @@
             else console.warn('Element not found:', id);
         }
 
-        safeAddListener('pause-btn', 'click', () => { isPaused = true; tutorialRunning = false; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
+        safeAddListener('pause-btn', 'click', () => { isPaused = true; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
         safeAddListener('resume-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
         safeAddListener('restart-menu-btn', 'click', init);
         safeAddListener('restart-btn', 'click', init);
@@ -1125,8 +1129,8 @@
             isPaused = false;
         });
 
-        safeAddListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; initTutorial(); });
-        safeAddListener('close-tutorial-btn', 'click', () => { document.getElementById('tutorial-modal').style.display = 'none'; if (!localStorage.getItem('sb_tutorial_shown')) { localStorage.setItem('sb_tutorial_shown', 'true'); init(); } else { isPaused = false; } tutorialRunning = false; });
+        safeAddListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; });
+        safeAddListener('close-tutorial-btn', 'click', () => { document.getElementById('tutorial-modal').style.display = 'none'; if (!localStorage.getItem('sb_tutorial_shown')) { localStorage.setItem('sb_tutorial_shown', 'true'); init(); } else { isPaused = false; } });
         safeAddListener('sound-toggle', 'change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
         safeAddListener('vibration-toggle', 'change', (e) => { settings.vibration = e.target.checked; });
 
@@ -1136,154 +1140,6 @@
         document.addEventListener('touchmove', handleDragMove, { passive: false });
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
-
-        // --- НОВОЕ ОБУЧЕНИЕ ---
-        let tutorialRunning = false;
-        let tutorialLoopId = null;
-        let tutCanvas, tutCtx;
-        let tutStep = 0;
-        let tutTimer = 0;
-        let tutGrid = []; 
-        const TUT_ROWS = 35;
-        const TUT_COLS = 30;
-
-        function initTutorial() {
-            if (tutorialLoopId) cancelAnimationFrame(tutorialLoopId);
-            
-            tutCanvas = document.getElementById('tutorial-canvas');
-            tutCtx = tutCanvas.getContext('2d');
-            tutorialRunning = true;
-            tutStep = 0; 
-            tutTimer = 0;
-            tutGrid = Array.from({length: TUT_ROWS}, () => Array(TUT_COLS).fill(0));
-            updateTutorial();
-        }
-
-        function updateTutorial() {
-            if (!tutorialRunning) return;
-            
-            tutCtx.fillStyle = '#000';
-            tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
-
-            tutTimer += 0.15;
-            
-            const handX_start = 40; 
-            const handX_end = 100;
-            const handY = 40; 
-            const blockY_end = 220; 
-            const T_SCALE = 8; 
-
-            // Физика песка
-            for (let y = TUT_ROWS - 2; y >= 0; y--) {
-                for (let x = 0; x < TUT_COLS; x++) {
-                    if (tutGrid[y][x] !== 0) {
-                        if (tutGrid[y+1][x] === 0) {
-                            tutGrid[y+1][x] = tutGrid[y][x];
-                            tutGrid[y][x] = 0;
-                        } 
-                        else {
-                            const dir = Math.random() > 0.5 ? 1 : -1;
-                            if (x + dir >= 0 && x + dir < TUT_COLS && tutGrid[y+1][x+dir] === 0) {
-                                tutGrid[y+1][x+dir] = tutGrid[y][x];
-                                tutGrid[y][x] = 0;
-                            }
-                        }
-                    }
-                }
-            }
-
-            const textEl = document.getElementById('tutorial-text');
-
-            if (tutStep === 0) { 
-                textEl.textContent = "Возьми фигуру";
-                drawHandWithBlock(handX_start, handY, false);
-                if (tutTimer > 40) { tutStep = 1; tutTimer = 0; }
-            }
-            else if (tutStep === 1) { 
-                textEl.textContent = "Перетащи на поле";
-                const progress = Math.min(tutTimer / 60, 1);
-                const curX = handX_start + (handX_end - handX_start) * progress;
-                drawHandWithBlock(curX, handY, false);
-                if (tutTimer > 70) { tutStep = 2; tutTimer = 0; }
-            }
-            else if (tutStep === 2) { 
-                textEl.textContent = "Отпусти - она рассыплется!";
-                const progress = Math.min(tutTimer / 40, 1);
-                const curY = handY + 25 + (blockY_end - (handY + 25)) * progress;
-                
-                if (progress < 1) {
-                    drawBlock(handX_end, curY, false);
-                } else {
-                    const startGx = Math.floor(handX_end / T_SCALE);
-                    const startGy = Math.floor(blockY_end / T_SCALE);
-                    for(let r=0; r<4; r++) {
-                        for(let c=0; c<4; c++) {
-                            if(startGy+r < TUT_ROWS && startGx+c < TUT_COLS) {
-                                tutGrid[startGy+r][startGx+c] = 1; 
-                            }
-                        }
-                    }
-                    tutStep = 3; tutTimer = 0;
-                }
-            }
-            else if (tutStep === 3) { 
-                textEl.textContent = "Собери линию одного цвета";
-                if (tutTimer > 100) { 
-                    for(let x=0; x<TUT_COLS; x++) tutGrid[TUT_ROWS-1][x] = 2;
-                    tutStep = 4; tutTimer = 0; 
-                }
-            }
-            else if (tutStep === 4) { 
-                if (Math.floor(tutTimer / 10) % 2 === 0) { 
-                     tutCtx.fillStyle = 'rgba(255,255,255,0.8)';
-                     tutCtx.fillRect(0, (TUT_ROWS-1) * T_SCALE, TUT_COLS * T_SCALE, T_SCALE);
-                }
-                if (tutTimer > 60) { 
-                    tutGrid = Array.from({length: TUT_ROWS}, () => Array(TUT_COLS).fill(0));
-                    tutStep = 0; tutTimer = 0; 
-                }
-            }
-
-            for (let y = 0; y < TUT_ROWS; y++) {
-                for (let x = 0; x < TUT_COLS; x++) {
-                    const val = tutGrid[y][x];
-                    if (val !== 0) {
-                        tutCtx.fillStyle = val === 1 ? '#33FF33' : '#FF3333';
-                        tutCtx.fillRect(x * T_SCALE, y * T_SCALE, T_SCALE, T_SCALE);
-                    }
-                }
-            }
-            
-            tutCtx.fillStyle = '#555';
-            tutCtx.fillRect(0, TUT_ROWS * T_SCALE, TUT_COLS * T_SCALE, 10);
-
-            if (tutorialRunning) {
-                tutorialLoopId = requestAnimationFrame(updateTutorial);
-            }
-        }
-
-        function drawHandWithBlock(x, y, isSand) {
-            tutCtx.font = "40px Arial"; 
-            tutCtx.fillStyle = "white"; 
-            tutCtx.fillText("👆", x + 15, y + 60);
-            drawBlock(x, y, isSand);
-        }
-        
-        function drawBlock(x, y, isSand) {
-            const pixelSize = 8;
-            const gridSize = 4; 
-            tutCtx.fillStyle = '#33FF33';
-            for(let i=0; i<gridSize; i++) {
-                for(let j=0; j<gridSize; j++) {
-                    tutCtx.fillRect(x + j*pixelSize, y + i*pixelSize, pixelSize-0.5, pixelSize-0.5);
-                }
-            }
-            if (!isSand) {
-                 tutCtx.strokeStyle = 'white'; 
-                 tutCtx.lineWidth = 1;
-                 tutCtx.strokeRect(x, y, gridSize*pixelSize, gridSize*pixelSize);
-            }
-        }
 
         bootGame();
     </script>
