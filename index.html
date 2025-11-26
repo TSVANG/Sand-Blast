@@ -277,17 +277,17 @@
             background: rgba(0, 247, 255, 0.15);
         }
 
-        /* Стили каталога игр (Обновлено) */
+        /* Стили каталога игр */
         .games-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr); /* 5) Три игры в ряд */
-            gap: 8px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
             margin-bottom: 15px;
         }
         .game-card {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
-            padding: 5px;
+            padding: 8px;
             cursor: pointer;
             transition: transform 0.1s;
             border: 1px solid #444;
@@ -300,13 +300,13 @@
             width: 100%;
             aspect-ratio: 1/1;
             background: #333;
-            border-radius: 16px; /* 6) Скругленные углы */
+            border-radius: 16px;
             margin-bottom: 5px;
             object-fit: cover;
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
         .game-title {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: bold;
             color: #fff;
             text-align: center;
@@ -355,7 +355,6 @@
 </head>
 <body>
 
-    <!-- Звуки -->
     <audio id="snd_bg" loop preload="auto"> <source src="bg_music.mp3" type="audio/mpeg"> </audio>
     <audio id="snd_pickup" preload="auto"> <source src="pickup.mp3" type="audio/mpeg"> </audio>
     <audio id="snd_drop" preload="auto"> <source src="drop.mp3" type="audio/mpeg"> </audio>
@@ -470,8 +469,7 @@
         const vkBridge = window.vkBridge;
         vkBridge.send('VKWebAppInit').catch(console.log);
 
-        // --- КАТАЛОГ ИГР (Обновлен) ---
-        // 4) Формат png
+        // --- КАТАЛОГ ИГР (Обновлен PNG) ---
         const GAMES_CATALOG = [
             { id: 54057569, name: "Wordle", img: "Wordle.png" }, 
             { id: 54053077, name: "Виселица", img: "viselitsa.png" },
@@ -533,43 +531,47 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- 3) СИНХРОНИЗАЦИЯ И СОХРАНЕНИЕ ---
+        // --- 3) СИНХРОНИЗАЦИЯ (ЖЕСТКАЯ С ВКОНТАКТЕ) ---
         
-        // Функция для работы с хранилищем ВК
         async function saveData(key, value) {
             try {
-                await vkBridge.send('VKWebAppStorageSet', { key: key, value: JSON.stringify(value) });
+                // Сохраняем и в локал (для скорости) и в облако
+                const valStr = JSON.stringify(value);
+                localStorage.setItem(key, valStr);
+                await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
             } catch (e) { console.error("Save error:", e); }
         }
 
         async function loadData(key) {
             try {
+                // Сначала пробуем облако (оно главнее при синхронизации)
                 const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
                 if (data.keys && data.keys[0].value) {
                     return JSON.parse(data.keys[0].value);
                 }
-            } catch (e) { console.error("Load error:", e); }
-            return null;
+            } catch (e) { console.error("Cloud load error:", e); }
+            
+            // Если облако недоступно/пусто, пробуем локал
+            const local = localStorage.getItem(key);
+            return local ? JSON.parse(local) : null;
         }
 
-        // Сохранение текущего состояния игры (в облако!)
+        // Сохранение всего состояния игры
         function saveCurrentGame() {
+            // Если игра не окончена
             if (!gameOver) {
-                // 3) Сохраняем всю сетку и состояние
                 const state = { 
                     grid, score, availablePieces, 
-                    stats, // Статистику тоже сохраняем тут
+                    stats, // Статистику тоже пишем внутрь, но и отдельно
                     timestamp: Date.now() 
                 };
                 saveData('sb_state', state);
             } else {
-                saveData('sb_state', null); // Стираем если проиграл
+                saveData('sb_state', null); 
             }
-            // Отдельно статистику тоже можно
             saveData('sb_stats', stats);
         }
 
-        // Автосохранение при сворачивании
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === 'hidden') {
                 saveCurrentGame();
@@ -619,18 +621,15 @@
 
         window.addEventListener('resize', () => { resizeGame(); draw(); });
 
-        // --- ГЛАВНЫЙ ЗАПУСК ---
+        // --- ЗАПУСК ---
         async function bootGame() {
             resizeGame();
             showBannerAd();
             
-            // Загружаем статистику (общую)
             const savedStats = await loadData('sb_stats');
             if (savedStats) stats = savedStats;
 
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
-            
-            // 3) Загружаем состояние игры из облака
             const cloudState = await loadData('sb_state');
 
             if (isFirstRun) {
@@ -638,7 +637,6 @@
                 init();
                 document.getElementById('tutorial-modal').style.display = 'flex';
             } else if (cloudState && cloudState.score > 0 && cloudState.grid && cloudState.grid.length > 0) {
-                // Если есть сохранение
                 document.getElementById('welcome-modal').style.display = 'flex';
                 
                 document.getElementById('welcome-continue-btn').onclick = () => {
@@ -648,7 +646,7 @@
                 
                 document.getElementById('welcome-new-btn').onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
-                    init(); // Новая игра
+                    init();
                 };
             } else {
                 init();
@@ -660,7 +658,7 @@
             grid = data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
-            if (data.stats) stats = data.stats; // Обновляем статы из сейва
+            if (data.stats) stats = data.stats;
             
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
@@ -674,7 +672,6 @@
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
-            // Очистка сохранения при новой игре
             saveData('sb_state', null);
             
             resizeGame();
@@ -689,7 +686,7 @@
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             draw();
             gameLoop();
-            saveCurrentGame(); // Сохраняем начало
+            saveCurrentGame(); 
         }
 
         function gameLoop() {
@@ -752,7 +749,6 @@
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
             showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
-            // 3) Сохраняем после каждого изменения счета
             saveCurrentGame();
         }
 
@@ -807,7 +803,6 @@
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
             
-            // Сохраняем статистику, но стираем текущую игру
             saveData('sb_stats', stats);
             saveData('sb_state', null);
             
@@ -1020,7 +1015,7 @@
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
-                saveCurrentGame(); // 3) Сохраняем ход
+                saveCurrentGame(); 
             }
             if (draggedPieceElement) draggedPieceElement.remove(); draggedPieceElement = null;
         }
@@ -1118,21 +1113,21 @@
         magicBtn.addEventListener('click', activateMagic);
         canvas.addEventListener('click', handleCanvasClick);
         
-        // 1) Исправление кнопки Меню и других
-        // Убеждаемся, что элементы существуют перед добавлением слушателей
+        // 1) Исправленная привязка событий (гарантированно после загрузки)
         function addSafeListener(id, event, handler) {
             const el = document.getElementById(id);
             if (el) el.addEventListener(event, handler);
+            else console.warn('Element not found:', id);
         }
 
-        addSafeListener('pause-btn', 'click', () => { isPaused = true; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
+        addSafeListener('menu-btn', 'click', () => { isPaused = true; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
         addSafeListener('resume-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
         addSafeListener('restart-menu-btn', 'click', init);
         addSafeListener('restart-btn', 'click', init);
         addSafeListener('rank-btn', 'click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
         addSafeListener('close-rank-btn', 'click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
         
-        // 2) Исправление Каталога игр
+        // 2) Исправленный каталог игр
         addSafeListener('games-btn', 'click', () => {
             isPaused = true;
             const list = document.getElementById('games-list');
@@ -1140,9 +1135,8 @@
             GAMES_CATALOG.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
-                // Добавляем onerror для картинок
+                // 4) Добавлен onerror для картинок
                 card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
-                // Исправлен вызов VKWebAppShowApp
                 card.onclick = () => {
                     console.log("Opening app:", game.id);
                     vkBridge.send("VKWebAppShowApp", { app_id: game.id })
@@ -1162,6 +1156,10 @@
         addSafeListener('sound-toggle', 'change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
         addSafeListener('vibration-toggle', 'change', (e) => { settings.vibration = e.target.checked; });
 
+        // Добавляем обработчики модальному окну продолжения
+        addSafeListener('welcome-continue-btn', 'click', () => { /* обработчик задается в bootGame */ });
+        addSafeListener('welcome-new-btn', 'click', () => { /* обработчик задается в bootGame */ });
+
         piecesContainer.addEventListener('mousedown', handleDragStart);
         piecesContainer.addEventListener('touchstart', handleDragStart, { passive: false });
         document.addEventListener('mousemove', handleDragMove);
@@ -1169,7 +1167,6 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
-        // Инициализация игры
         bootGame();
     </script>
 </body>
