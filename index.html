@@ -277,17 +277,17 @@
             background: rgba(0, 247, 255, 0.15);
         }
 
-        /* Стили каталога игр */
+        /* Стили каталога игр (Обновлено) */
         .games-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: repeat(3, 1fr); /* 5) Три игры в ряд */
+            gap: 8px;
             margin-bottom: 15px;
         }
         .game-card {
-            background: #252540;
-            border-radius: 10px;
-            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 5px;
             cursor: pointer;
             transition: transform 0.1s;
             border: 1px solid #444;
@@ -299,16 +299,18 @@
         .game-img {
             width: 100%;
             aspect-ratio: 1/1;
-            background: #333; /* Заглушка, если картинки нет */
-            border-radius: 8px;
-            margin-bottom: 8px;
+            background: #333;
+            border-radius: 16px; /* 6) Скругленные углы */
+            margin-bottom: 5px;
             object-fit: cover;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
         .game-title {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: bold;
             color: #fff;
             text-align: center;
+            line-height: 1.2;
         }
 
         #dragged-piece {
@@ -377,7 +379,6 @@
 
     <div id="controls-area">
         <div id="buttons-row">
-            <!-- Кнопки с эмодзи -->
             <button id="menu-btn" class="icon-btn">⏸️ Меню</button>
             <button id="magic-btn" class="icon-btn">🪄 Магия <span class="ad-icon">AD</span></button>
             <button id="rank-btn" class="icon-btn">🏆 Топ</button>
@@ -414,7 +415,7 @@
         <div class="modal-content">
             <h2>Sand Blast</h2>
             <p style="margin: 20px 0; color: #aaa">Найдена сохраненная игра</p>
-            <button class="modal-btn primary" id="welcome-continue-btn">Загрузить</button>
+            <button class="modal-btn primary" id="welcome-continue-btn">Продолжить</button>
             <button class="modal-btn" id="welcome-new-btn">Новая игра</button>
         </div>
     </div>
@@ -469,13 +470,14 @@
         const vkBridge = window.vkBridge;
         vkBridge.send('VKWebAppInit').catch(console.log);
 
-        // --- КАТАЛОГ ИГР ---
+        // --- КАТАЛОГ ИГР (Обновлен) ---
+        // 4) Формат png
         const GAMES_CATALOG = [
-            { id: 54057569, name: "Wordle", img: "Wordle.jpg" }, 
-            { id: 54053077, name: "Виселица", img: "viselitsa.jpg" },
-            { id: 54051783, name: "Numberzilla", img: "Numberzilla.jpg" },
-            { id: 54040298, name: "Судоку", img: "Sudoku.jpg" },
-            { id: 53993726, name: "Кибер-Змей 3000", img: "Zmei.jpg" }
+            { id: 54057569, name: "Wordle", img: "Wordle.png" }, 
+            { id: 54053077, name: "Виселица", img: "viselitsa.png" },
+            { id: 54051783, name: "Numberzilla", img: "Numberzilla.png" },
+            { id: 54040298, name: "Судоку", img: "Sudoku.png" },
+            { id: 53993726, name: "Кибер-Змей 3000", img: "Zmei.png" }
         ];
 
         const canvas = document.getElementById('gameCanvas');
@@ -531,54 +533,46 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- 1) СИНХРОНИЗАЦИЯ (По образцу) ---
-        // Загружаем/сохраняем данные в облаке VK
+        // --- 3) СИНХРОНИЗАЦИЯ И СОХРАНЕНИЕ ---
+        
+        // Функция для работы с хранилищем ВК
+        async function saveData(key, value) {
+            try {
+                await vkBridge.send('VKWebAppStorageSet', { key: key, value: JSON.stringify(value) });
+            } catch (e) { console.error("Save error:", e); }
+        }
+
         async function loadData(key) {
             try {
                 const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
                 if (data.keys && data.keys[0].value) {
                     return JSON.parse(data.keys[0].value);
                 }
-            } catch (error) { console.error(`Failed to load ${key}:`, error); }
+            } catch (e) { console.error("Load error:", e); }
             return null;
         }
 
-        async function saveData(key, value) {
-            try {
-                await vkBridge.send('VKWebAppStorageSet', { key: key, value: JSON.stringify(value) });
-            } catch (error) { console.error(`Failed to save ${key}:`, error); }
-        }
-
-        // Загрузка статистики
-        async function loadStats() {
-            const savedStats = await loadData('sb_stats');
-            if (savedStats) stats = savedStats;
-        }
-
-        // Сохранение статистики
-        async function saveStats() {
-             // Сохраняем локально для скорости и в облако для надежности
-             localStorage.setItem('sb_stats_local', JSON.stringify(stats));
-             await saveData('sb_stats', stats);
-        }
-
-        // Сохранение текущего прогресса
+        // Сохранение текущего состояния игры (в облако!)
         function saveCurrentGame() {
-            // Если игра не окончена, сохраняем состояние
             if (!gameOver) {
-                const state = { grid, score, availablePieces, timestamp: Date.now() };
+                // 3) Сохраняем всю сетку и состояние
+                const state = { 
+                    grid, score, availablePieces, 
+                    stats, // Статистику тоже сохраняем тут
+                    timestamp: Date.now() 
+                };
                 saveData('sb_state', state);
             } else {
-                // Если окончена, очищаем слот сохранения
-                saveData('sb_state', null);
+                saveData('sb_state', null); // Стираем если проиграл
             }
+            // Отдельно статистику тоже можно
+            saveData('sb_stats', stats);
         }
 
-        // 1) Слушатель закрытия/сворачивания
+        // Автосохранение при сворачивании
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === 'hidden') {
                 saveCurrentGame();
-                saveStats();
             }
         });
 
@@ -625,35 +619,36 @@
 
         window.addEventListener('resize', () => { resizeGame(); draw(); });
 
-        // --- ГЛАВНЫЙ СТАРТ ---
+        // --- ГЛАВНЫЙ ЗАПУСК ---
         async function bootGame() {
             resizeGame();
             showBannerAd();
             
-            // Загружаем статистику
-            await loadStats();
+            // Загружаем статистику (общую)
+            const savedStats = await loadData('sb_stats');
+            if (savedStats) stats = savedStats;
 
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
             
-            // Пытаемся загрузить сохранение из облака
-            const savedState = await loadData('sb_state');
+            // 3) Загружаем состояние игры из облака
+            const cloudState = await loadData('sb_state');
 
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
                 init();
                 document.getElementById('tutorial-modal').style.display = 'flex';
-            } else if (savedState && savedState.score > 0 && savedState.grid && savedState.grid.length > 0) {
-                // 1) Если есть сохранение, показываем диалог
+            } else if (cloudState && cloudState.score > 0 && cloudState.grid && cloudState.grid.length > 0) {
+                // Если есть сохранение
                 document.getElementById('welcome-modal').style.display = 'flex';
                 
                 document.getElementById('welcome-continue-btn').onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
-                    restoreGame(savedState);
+                    restoreGame(cloudState);
                 };
                 
                 document.getElementById('welcome-new-btn').onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
-                    init();
+                    init(); // Новая игра
                 };
             } else {
                 init();
@@ -665,6 +660,8 @@
             grid = data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
+            if (data.stats) stats = data.stats; // Обновляем статы из сейва
+            
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
@@ -677,7 +674,7 @@
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
-            // Сбрасываем сохранение в облаке при новой игре
+            // Очистка сохранения при новой игре
             saveData('sb_state', null);
             
             resizeGame();
@@ -692,7 +689,7 @@
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             draw();
             gameLoop();
-            saveCurrentGame(); // Сразу сохраняем старт
+            saveCurrentGame(); // Сохраняем начало
         }
 
         function gameLoop() {
@@ -755,7 +752,7 @@
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
             showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
-            // Сохраняем при изменении счета
+            // 3) Сохраняем после каждого изменения счета
             saveCurrentGame();
         }
 
@@ -810,8 +807,9 @@
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
             
-            saveStats(); // Сохраняем рекорды
-            saveData('sb_state', null); // Стираем прогресс партии
+            // Сохраняем статистику, но стираем текущую игру
+            saveData('sb_stats', stats);
+            saveData('sb_state', null);
             
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
@@ -871,7 +869,7 @@
                     playSound('magic'); vibrate('heavy'); 
                     for(let r=0; r<MICRO_ROWS; r++) for(let c=0; c<MICRO_COLS; c++) if(Math.abs(grid[r][c]) === colorVal) grid[r][c] = 0;
                     isBoardStable = false; isMagicActive = false; updateMagicState(); 
-                    saveCurrentGame(); // Сохраняем после магии
+                    saveCurrentGame();
                 }
             }
         }
@@ -1022,7 +1020,7 @@
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
-                saveCurrentGame(); // Сохраняем после хода
+                saveCurrentGame(); // 3) Сохраняем ход
             }
             if (draggedPieceElement) draggedPieceElement.remove(); draggedPieceElement = null;
         }
@@ -1120,47 +1118,49 @@
         magicBtn.addEventListener('click', activateMagic);
         canvas.addEventListener('click', handleCanvasClick);
         
-        // Safe Event Listeners
-        function safeAddListener(id, event, handler) {
+        // 1) Исправление кнопки Меню и других
+        // Убеждаемся, что элементы существуют перед добавлением слушателей
+        function addSafeListener(id, event, handler) {
             const el = document.getElementById(id);
             if (el) el.addEventListener(event, handler);
-            else console.warn('Element not found:', id);
         }
 
-        safeAddListener('pause-btn', 'click', () => { isPaused = true; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
-        safeAddListener('resume-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
-        safeAddListener('restart-menu-btn', 'click', init);
-        safeAddListener('restart-btn', 'click', init);
-        safeAddListener('rank-btn', 'click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
-        safeAddListener('close-rank-btn', 'click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
+        addSafeListener('pause-btn', 'click', () => { isPaused = true; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
+        addSafeListener('resume-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
+        addSafeListener('restart-menu-btn', 'click', init);
+        addSafeListener('restart-btn', 'click', init);
+        addSafeListener('rank-btn', 'click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
+        addSafeListener('close-rank-btn', 'click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
         
-        // Каталог (ИСПРАВЛЕНО)
-        safeAddListener('games-btn', 'click', () => {
+        // 2) Исправление Каталога игр
+        addSafeListener('games-btn', 'click', () => {
             isPaused = true;
             const list = document.getElementById('games-list');
             list.innerHTML = '';
             GAMES_CATALOG.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
+                // Добавляем onerror для картинок
                 card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
+                // Исправлен вызов VKWebAppShowApp
                 card.onclick = () => {
-                    // Отправка события для открытия приложения
+                    console.log("Opening app:", game.id);
                     vkBridge.send("VKWebAppShowApp", { app_id: game.id })
-                        .catch(e => console.error("Error opening app:", e));
+                        .catch(error => console.error("Failed to open app:", error));
                 };
                 list.appendChild(card);
             });
             document.getElementById('games-modal').style.display = 'flex';
         });
-        safeAddListener('close-games-btn', 'click', () => {
+        addSafeListener('close-games-btn', 'click', () => {
             document.getElementById('games-modal').style.display = 'none';
             isPaused = false;
         });
 
-        safeAddListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; });
-        safeAddListener('close-tutorial-btn', 'click', () => { document.getElementById('tutorial-modal').style.display = 'none'; if (!localStorage.getItem('sb_tutorial_shown')) { localStorage.setItem('sb_tutorial_shown', 'true'); init(); } else { isPaused = false; } });
-        safeAddListener('sound-toggle', 'change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
-        safeAddListener('vibration-toggle', 'change', (e) => { settings.vibration = e.target.checked; });
+        addSafeListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; });
+        addSafeListener('close-tutorial-btn', 'click', () => { document.getElementById('tutorial-modal').style.display = 'none'; if (!localStorage.getItem('sb_tutorial_shown')) { localStorage.setItem('sb_tutorial_shown', 'true'); init(); } else { isPaused = false; } });
+        addSafeListener('sound-toggle', 'change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
+        addSafeListener('vibration-toggle', 'change', (e) => { settings.vibration = e.target.checked; });
 
         piecesContainer.addEventListener('mousedown', handleDragStart);
         piecesContainer.addEventListener('touchstart', handleDragStart, { passive: false });
@@ -1169,6 +1169,7 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
+        // Инициализация игры
         bootGame();
     </script>
 </body>
