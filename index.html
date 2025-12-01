@@ -532,7 +532,7 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- 1) СИНХРОНИЗАЦИЯ ---
+        // --- 1) СИНХРОНИЗАЦИЯ (ЖЕСТКАЯ С ВКОНТАКТЕ) ---
         
         async function saveData(key, value) {
             try {
@@ -543,6 +543,7 @@
         }
 
         async function loadData(key) {
+            // Сначала пробуем облако (оно главнее при синхронизации)
             try {
                 const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
                 if (data.keys && data.keys[0].value) {
@@ -550,10 +551,12 @@
                 }
             } catch (e) { console.error("Cloud load error:", e); }
             
+            // Если облако недоступно, пробуем локал
             const local = localStorage.getItem(key);
             return local ? JSON.parse(local) : null;
         }
 
+        // Синхронизация статистики: берем МАКСИМУМ из облака и локала
         async function syncStatsWithCloud() {
              const cloudStats = await loadData('sb_stats');
              const localStatsRaw = localStorage.getItem('sb_stats_local');
@@ -565,20 +568,25 @@
              } else {
                  stats = localStats;
              }
+             
+             // Сохраняем объединенный результат везде
              saveData('sb_stats', stats);
         }
 
         function saveCurrentGame() {
+            // Если игра не окончена
             if (!gameOver) {
                 const state = { 
                     grid, score, availablePieces, 
-                    stats,
+                    stats, // Статистику тоже пишем внутрь, но и отдельно
                     timestamp: Date.now() 
                 };
                 saveData('sb_state', state);
             } else {
                 saveData('sb_state', null); 
             }
+            
+            // Обновляем рекорд если текущий счет больше
             if (score > stats.record) stats.record = score;
             saveData('sb_stats', stats);
         }
@@ -589,6 +597,7 @@
             }
         });
 
+        // --- РЕКЛАМА ---
         function showBannerAd() {
             if (vkBridge.supports("VKWebAppShowBannerAd")) {
                 vkBridge.send("VKWebAppShowBannerAd", { banner_location: "bottom" })
