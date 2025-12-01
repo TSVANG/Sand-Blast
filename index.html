@@ -470,7 +470,9 @@
 
     <script>
         const vkBridge = window.vkBridge;
-        vkBridge.send('VKWebAppInit').catch(console.log);
+        if(vkBridge) {
+            vkBridge.send('VKWebAppInit').catch(console.log);
+        }
 
         const GAMES_CATALOG = [
             { id: 54057569, name: "Wordle", img: "Wordle.png" }, 
@@ -502,7 +504,7 @@
         };
 
         function preloadSounds() {
-            Object.values(sounds).forEach(snd => { snd.load(); snd.volume = 0.5; });
+            Object.values(sounds).forEach(snd => { if(snd) { snd.load(); snd.volume = 0.5; } });
         }
         preloadSounds();
 
@@ -540,16 +542,20 @@
             try {
                 const valStr = JSON.stringify(value);
                 localStorage.setItem(key, valStr);
-                await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
+                if (vkBridge && vkBridge.supports("VKWebAppStorageSet")) {
+                    await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
+                }
             } catch (e) { console.error("Save error:", e); }
         }
 
         // Чтение из хранилища (облако > локал)
         async function loadData(key) {
             try {
-                const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
-                if (data.keys && data.keys[0].value) {
-                    return JSON.parse(data.keys[0].value);
+                if (vkBridge && vkBridge.supports("VKWebAppStorageGet")) {
+                    const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
+                    if (data.keys && data.keys[0].value) {
+                        return JSON.parse(data.keys[0].value);
+                    }
                 }
             } catch (e) { console.error("Cloud load error:", e); }
             
@@ -600,19 +606,19 @@
         });
 
         function showBannerAd() {
-            if (vkBridge.supports("VKWebAppShowBannerAd")) {
+            if (vkBridge && vkBridge.supports("VKWebAppShowBannerAd")) {
                 vkBridge.send("VKWebAppShowBannerAd", { banner_location: "bottom" })
                 .then((data) => { if (data.result) { bannerHeight = 60; resizeGame(); } })
                 .catch(console.log);
             }
         }
         function showInterstitialAd() {
-            if (vkBridge.supports("VKWebAppShowNativeAds")) {
+            if (vkBridge && vkBridge.supports("VKWebAppShowNativeAds")) {
                 vkBridge.send("VKWebAppShowNativeAds", { ad_format: "interstitial" }).catch(console.log);
             }
         }
         function showRewardedAd(onSuccess) {
-            if (vkBridge.supports("VKWebAppShowNativeAds")) {
+            if (vkBridge && vkBridge.supports("VKWebAppShowNativeAds")) {
                 vkBridge.send("VKWebAppShowNativeAds", { ad_format: "reward" })
                 .then((data) => { if (data.result) onSuccess(); })
                 .catch((e) => { onSuccess(); });
@@ -645,11 +651,18 @@
             resizeGame();
             showBannerAd();
             
-            await syncStatsWithCloud(); // Синхронизируем рекорды
+            // Обернул в try-catch для безопасности
+            try {
+                await syncStatsWithCloud();
+            } catch(e) {
+                console.log("Cloud sync failed, continuing offline", e);
+            }
             
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
-            // Загружаем незаконченную игру
-            const cloudState = await loadData('sb_state');
+            let cloudState = null;
+            try {
+                cloudState = await loadData('sb_state');
+            } catch(e) { console.log("Failed loading state", e); }
 
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
@@ -693,7 +706,14 @@
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
             resizeGame();
             updateScoreUI();
-            drawPieceSelectors();
+            
+            // Если вдруг сохранение без фигур - генерируем
+            if (!availablePieces || availablePieces.length === 0) {
+                generateNewPieces();
+            } else {
+                drawPieceSelectors();
+            }
+            
             draw();
             gameLoop();
         }
@@ -883,13 +903,17 @@
         
         function updateMagicState() {
             if (isMagicActive) { 
-                magicBtn.classList.add('active'); 
-                magicBtn.innerHTML = '✨ ВЫБЕРИ ЦВЕТ';
-                gameWrapper.classList.add('magic-active');
+                if(magicBtn) {
+                    magicBtn.classList.add('active'); 
+                    magicBtn.innerHTML = '✨ ВЫБЕРИ ЦВЕТ';
+                }
+                if(gameWrapper) gameWrapper.classList.add('magic-active');
             } else { 
-                magicBtn.classList.remove('active'); 
-                magicBtn.innerHTML = '🪄 Магия <span class="ad-icon">AD</span>';
-                gameWrapper.classList.remove('magic-active');
+                if(magicBtn) {
+                    magicBtn.classList.remove('active'); 
+                    magicBtn.innerHTML = '🪄 Магия <span class="ad-icon">AD</span>';
+                }
+                if(gameWrapper) gameWrapper.classList.remove('magic-active');
             }
         }
 
@@ -947,12 +971,16 @@
         }
 
         function drawPieceSelectors() {
+            if (!piecesContainer) return;
             piecesContainer.innerHTML = '';
             availablePieces.forEach((piece, index) => {
                 const preview = document.createElement('canvas');
                 preview.className = 'piece-preview';
                 preview.dataset.index = index;
                 const blockSize = 18; 
+                // Защита от ошибок в данных фигур
+                if (!piece.shape || piece.shape.length === 0) return;
+                
                 const w = piece.shape[0].length * blockSize;
                 const h = piece.shape.length * blockSize;
                 preview.width = w; preview.height = h;
@@ -987,6 +1015,8 @@
 
             selectedPieceIndex = parseInt(e.target.dataset.index);
             const piece = availablePieces[selectedPieceIndex];
+            if (!piece) return;
+
             isDragging = true;
             
             draggedPieceElement = document.createElement('canvas');
@@ -1119,6 +1149,69 @@
             const el = document.getElementById(id);
             if (el) el.addEventListener(event, handler);
         }
+        
+        // --- MISSING HELPER FUNCTIONS & LISTENERS RESTORED ---
+        
+        function addScore(points) {
+            score += points;
+            updateScoreUI();
+        }
+
+        function updateScoreUI() {
+            if (scoreText) scoreText.textContent = score + " / " + 25000; // Пример
+            if (scoreFill) {
+                const pct = Math.min((score / 25000) * 100, 100);
+                scoreFill.style.width = pct + "%";
+            }
+        }
+
+        function darkenColor(color, percent) {
+             // Простая реализация затемнения/осветления HEX цвета
+             // Если передан '#FF3333' и percent -30
+             var f=parseInt(color.slice(1),16),t=percent<0?0:255,p=percent<0?percent*-1:percent,R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF;
+             return "#"+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1);
+        }
+
+        function playSound(id) {
+            if (!settings.sound) return;
+            const s = sounds[id];
+            if (s) {
+                s.currentTime = 0;
+                s.play().catch(e=>console.log(e));
+            }
+        }
+
+        function vibrate(type) {
+            if (!settings.vibration || !navigator.vibrate) return;
+            // Простая вибрация, если поддерживается
+            if (type === 'heavy') navigator.vibrate(50);
+            else navigator.vibrate(20);
+        }
+
+        function showPopupText(text, x, y) {
+            const div = document.createElement('div');
+            div.className = 'popup-text';
+            div.textContent = text;
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 1000);
+        }
+
+        // Add magic button listener
+        addSafeListener('magic-btn', 'click', activateMagic);
+        
+        // Add canvas click listener for magic
+        if(canvas) {
+            canvas.addEventListener('mousedown', handleCanvasClick);
+            canvas.addEventListener('touchstart', (e) => {
+                // Предотвращаем дефолтный зум/скролл
+                if(e.cancelable) e.preventDefault();
+                // Передаем первое касание как клик
+                const touch = e.touches[0];
+                handleCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+            }, {passive: false});
+        }
 
         function generateLeaderboard() {
             const names = ["Алексей", "Мария", "Иван", "Елена", "Дмитрий", "Ольга", "Сергей", "Анна", "Николай", "Татьяна"];
@@ -1163,8 +1256,10 @@
                 // 2) Правильный метод VKWebAppOpenApp
                 card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
                 card.onclick = () => {
-                    vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
-                        .catch(error => console.error("Failed to open app:", error));
+                    if (vkBridge) {
+                        vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
+                            .catch(error => console.error("Failed to open app:", error));
+                    }
                 };
                 list.appendChild(card);
             });
