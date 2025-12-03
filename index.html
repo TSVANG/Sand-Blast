@@ -14,7 +14,6 @@
             user-select: none;
             touch-action: none;
             -webkit-tap-highlight-color: transparent;
-            outline: none; /* Убирает обводку при фокусе */
         }
 
         body {
@@ -297,15 +296,13 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* Убираем выделение */
-            -webkit-tap-highlight-color: transparent;
         }
         .game-card:active { transform: scale(0.95); }
         .game-img {
             width: 100%;
             aspect-ratio: 1/1;
             background: #333;
-            border-radius: 16px; 
+            border-radius: 16px; /* 6) Сильно скругленные углы */
             margin-bottom: 5px;
             object-fit: cover;
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
@@ -341,6 +338,7 @@
             to { opacity: 0; transform: translateY(-60px) scale(1.2); }
         }
         
+        /* Стили для текстового обучения */
         .tutorial-step {
             margin-bottom: 15px;
             text-align: left;
@@ -470,10 +468,9 @@
 
     <script>
         const vkBridge = window.vkBridge;
-        if(vkBridge) {
-            vkBridge.send('VKWebAppInit').catch(console.log);
-        }
+        vkBridge.send('VKWebAppInit').catch(console.log);
 
+        // --- КАТАЛОГ ИГР (Обновлен PNG) ---
         const GAMES_CATALOG = [
             { id: 54057569, name: "Wordle", img: "Wordle.png" }, 
             { id: 54053077, name: "Виселица", img: "viselitsa.png" },
@@ -504,7 +501,7 @@
         };
 
         function preloadSounds() {
-            Object.values(sounds).forEach(snd => { if(snd) { snd.load(); snd.volume = 0.5; } });
+            Object.values(sounds).forEach(snd => { snd.load(); snd.volume = 0.5; });
         }
         preloadSounds();
 
@@ -535,58 +532,53 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- 1) НАДЕЖНОЕ СОХРАНЕНИЕ И СИНХРОНИЗАЦИЯ ---
+        // --- 1) СИНХРОНИЗАЦИЯ (ЖЕСТКАЯ С ВКОНТАКТЕ) ---
         
-        // Запись в хранилище (локал + облако)
         async function saveData(key, value) {
             try {
                 const valStr = JSON.stringify(value);
                 localStorage.setItem(key, valStr);
-                if (vkBridge && vkBridge.supports("VKWebAppStorageSet")) {
-                    await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
-                }
+                await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
             } catch (e) { console.error("Save error:", e); }
         }
 
-        // Чтение из хранилища (облако > локал)
         async function loadData(key) {
+            // Сначала пробуем облако (оно главнее при синхронизации)
             try {
-                if (vkBridge && vkBridge.supports("VKWebAppStorageGet")) {
-                    const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
-                    if (data.keys && data.keys[0].value) {
-                        return JSON.parse(data.keys[0].value);
-                    }
+                const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
+                if (data.keys && data.keys[0].value) {
+                    return JSON.parse(data.keys[0].value);
                 }
             } catch (e) { console.error("Cloud load error:", e); }
             
+            // Если облако недоступно, пробуем локал
             const local = localStorage.getItem(key);
             return local ? JSON.parse(local) : null;
         }
 
-        // Синхронизация рекордов: берем МАКСИМУМ
+        // Синхронизация статистики: берем МАКСИМУМ из облака и локала
         async function syncStatsWithCloud() {
-             // Загружаем облачные
              const cloudStats = await loadData('sb_stats');
-             // Загружаем локальные
-             const localStatsStr = localStorage.getItem('sb_stats');
-             let localStats = localStatsStr ? JSON.parse(localStatsStr) : { gamesPlayed: 0, record: 0 };
+             const localStatsRaw = localStorage.getItem('sb_stats_local');
+             let localStats = localStatsRaw ? JSON.parse(localStatsRaw) : { gamesPlayed: 0, record: 0 };
 
              if (cloudStats) {
-                 // Сливаем
                  stats.gamesPlayed = Math.max(localStats.gamesPlayed, cloudStats.gamesPlayed || 0);
                  stats.record = Math.max(localStats.record, cloudStats.record || 0);
              } else {
                  stats = localStats;
              }
-             // Сохраняем объединенный результат
+             
+             // Сохраняем объединенный результат везде
              saveData('sb_stats', stats);
         }
 
-        // Сохранение текущего состояния (сетка, фигуры)
         function saveCurrentGame() {
+            // Если игра не окончена
             if (!gameOver) {
                 const state = { 
                     grid, score, availablePieces, 
+                    stats, // Статистику тоже пишем внутрь, но и отдельно
                     timestamp: Date.now() 
                 };
                 saveData('sb_state', state);
@@ -594,7 +586,7 @@
                 saveData('sb_state', null); 
             }
             
-            // Всегда обновляем рекорд при сохранении игры
+            // Обновляем рекорд если текущий счет больше
             if (score > stats.record) stats.record = score;
             saveData('sb_stats', stats);
         }
@@ -605,20 +597,21 @@
             }
         });
 
+        // --- РЕКЛАМА ---
         function showBannerAd() {
-            if (vkBridge && vkBridge.supports("VKWebAppShowBannerAd")) {
+            if (vkBridge.supports("VKWebAppShowBannerAd")) {
                 vkBridge.send("VKWebAppShowBannerAd", { banner_location: "bottom" })
                 .then((data) => { if (data.result) { bannerHeight = 60; resizeGame(); } })
                 .catch(console.log);
             }
         }
         function showInterstitialAd() {
-            if (vkBridge && vkBridge.supports("VKWebAppShowNativeAds")) {
+            if (vkBridge.supports("VKWebAppShowNativeAds")) {
                 vkBridge.send("VKWebAppShowNativeAds", { ad_format: "interstitial" }).catch(console.log);
             }
         }
         function showRewardedAd(onSuccess) {
-            if (vkBridge && vkBridge.supports("VKWebAppShowNativeAds")) {
+            if (vkBridge.supports("VKWebAppShowNativeAds")) {
                 vkBridge.send("VKWebAppShowNativeAds", { ad_format: "reward" })
                 .then((data) => { if (data.result) onSuccess(); })
                 .catch((e) => { onSuccess(); });
@@ -651,32 +644,22 @@
             resizeGame();
             showBannerAd();
             
-            // Обернул в try-catch для безопасности
-            try {
-                await syncStatsWithCloud();
-            } catch(e) {
-                console.log("Cloud sync failed, continuing offline", e);
-            }
-            
+            await syncStatsWithCloud();
+
             const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
-            let cloudState = null;
-            try {
-                cloudState = await loadData('sb_state');
-            } catch(e) { console.log("Failed loading state", e); }
+            const cloudState = await loadData('sb_state');
 
             if (isFirstRun) {
                 localStorage.setItem('sb_tutorial_shown', 'true');
                 init();
                 document.getElementById('tutorial-modal').style.display = 'flex';
             } else if (cloudState && cloudState.score > 0 && cloudState.grid && cloudState.grid.length > 0) {
-                // Есть сохранение! Показываем диалог
                 document.getElementById('welcome-modal').style.display = 'flex';
                 
-                // Используем клонирование для очистки старых слушателей
+                // Фикс бага с кнопками: пересоздаем их
                 let oldBtn = document.getElementById('welcome-continue-btn');
                 let newBtn = oldBtn.cloneNode(true);
                 oldBtn.parentNode.replaceChild(newBtn, oldBtn);
-                
                 newBtn.onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
                     restoreGame(cloudState);
@@ -685,7 +668,6 @@
                 let oldNewBtn = document.getElementById('welcome-new-btn');
                 let newNewBtn = oldNewBtn.cloneNode(true);
                 oldNewBtn.parentNode.replaceChild(newNewBtn, oldNewBtn);
-
                 newNewBtn.onclick = () => {
                     document.getElementById('welcome-modal').style.display = 'none';
                     init();
@@ -700,27 +682,21 @@
             grid = data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
+            if (data.stats) stats = data.stats;
             
             gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false; isBoardStable = true;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
             resizeGame();
             updateScoreUI();
-            
-            // Если вдруг сохранение без фигур - генерируем
-            if (!availablePieces || availablePieces.length === 0) {
-                generateNewPieces();
-            } else {
-                drawPieceSelectors();
-            }
-            
+            drawPieceSelectors();
             draw();
             gameLoop();
         }
 
         function init() {
             if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
-            saveData('sb_state', null); // Стираем старую игру при новой
+            saveData('sb_state', null);
             
             resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
@@ -797,7 +773,7 @@
             const points = Math.floor(pixels.length * 1.5);
             addScore(points);
             showPopupText(`+${points}`, canvas.width/2, canvas.height/2);
-            saveCurrentGame(); // 1) Сохраняем после каждого хода!
+            saveCurrentGame();
         }
 
         function findConnectedLines() {
@@ -851,8 +827,8 @@
             stats.gamesPlayed++;
             if (score > stats.record) stats.record = score;
             
-            saveData('sb_stats', stats); // Сохраняем новый рекорд
-            saveData('sb_state', null);  // Стираем игру
+            saveData('sb_stats', stats);
+            saveData('sb_state', null);
             
             finalScoreSpan.textContent = score;
             document.getElementById('gameover-modal').style.display = 'flex';
@@ -864,24 +840,21 @@
             availablePieces = [];
             for (let i = 0; i < 3; i++) {
                 const shape = PIECES[Math.floor(Math.random() * PIECES.length)].shape;
+                let colorOptions = [1, 2, 3, 4]; 
+                if (score >= 25000) colorOptions.push(5); 
+                if (score >= 50000) colorOptions.push(6); 
+                if (score >= 75000) colorOptions.push(7); 
+                if (score >= 100000) colorOptions.push(8); 
                 
-                // 5) Двухцветные блоки
-                const isDual = Math.random() < 0.3;
-                let availableColors = [1, 2, 3, 4]; 
-                if (score >= 25000) availableColors.push(5); 
-                if (score >= 50000) availableColors.push(6); 
-                if (score >= 75000) availableColors.push(7); 
-                if (score >= 100000) availableColors.push(8);
-                
-                const color1 = availableColors[Math.floor(Math.random() * availableColors.length)];
+                const color1 = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+                // 5) Двухцветные (шанс 30%)
                 let pieceObj = { shape, color: color1 };
-
-                if (isDual && availableColors.length > 1) {
+                if (Math.random() < 0.3 && colorOptions.length > 1) {
                     let color2 = color1;
                     while(color2 === color1) {
-                        color2 = availableColors[Math.floor(Math.random() * availableColors.length)];
+                        color2 = colorOptions[Math.floor(Math.random() * colorOptions.length)];
                     }
-                    pieceObj.color = [color1, color2]; // Храним как массив
+                    pieceObj.color = [color1, color2];
                 }
                 availablePieces.push(pieceObj);
             }
@@ -903,17 +876,13 @@
         
         function updateMagicState() {
             if (isMagicActive) { 
-                if(magicBtn) {
-                    magicBtn.classList.add('active'); 
-                    magicBtn.innerHTML = '✨ ВЫБЕРИ ЦВЕТ';
-                }
-                if(gameWrapper) gameWrapper.classList.add('magic-active');
+                magicBtn.classList.add('active'); 
+                magicBtn.innerHTML = '✨ ВЫБЕРИ ЦВЕТ';
+                gameWrapper.classList.add('magic-active');
             } else { 
-                if(magicBtn) {
-                    magicBtn.classList.remove('active'); 
-                    magicBtn.innerHTML = '🪄 Магия <span class="ad-icon">AD</span>';
-                }
-                if(gameWrapper) gameWrapper.classList.remove('magic-active');
+                magicBtn.classList.remove('active'); 
+                magicBtn.innerHTML = '🪄 Магия <span class="ad-icon">AD</span>';
+                gameWrapper.classList.remove('magic-active');
             }
         }
 
@@ -971,16 +940,12 @@
         }
 
         function drawPieceSelectors() {
-            if (!piecesContainer) return;
             piecesContainer.innerHTML = '';
             availablePieces.forEach((piece, index) => {
                 const preview = document.createElement('canvas');
                 preview.className = 'piece-preview';
                 preview.dataset.index = index;
                 const blockSize = 18; 
-                // Защита от ошибок в данных фигур
-                if (!piece.shape || piece.shape.length === 0) return;
-                
                 const w = piece.shape[0].length * blockSize;
                 const h = piece.shape.length * blockSize;
                 preview.width = w; preview.height = h;
@@ -989,7 +954,6 @@
                 for(let y=0; y<piece.shape.length; y++){
                     for(let x=0; x<piece.shape[y].length; x++){
                         if(piece.shape[y][x]) {
-                            // 5) Отрисовка двухцветного превью
                             if (Array.isArray(piece.color)) {
                                 const shapeW = piece.shape[0].length;
                                 pCtx.fillStyle = (x < shapeW / 2) ? COLORS[piece.color[0]] : COLORS[piece.color[1]];
@@ -1015,8 +979,6 @@
 
             selectedPieceIndex = parseInt(e.target.dataset.index);
             const piece = availablePieces[selectedPieceIndex];
-            if (!piece) return;
-
             isDragging = true;
             
             draggedPieceElement = document.createElement('canvas');
@@ -1079,10 +1041,8 @@
             const piece = availablePieces[selectedPieceIndex];
             const valid = canPlacePiece(piece, relY, relX);
             draggedPieceElement.style.opacity = valid ? '1.0' : '0.5';
-            
-            // Цвет тени для перетаскиваемой фигуры
-            let shadowColor = Array.isArray(piece.color) ? COLORS[piece.color[0]] : COLORS[piece.color];
-            draggedPieceElement.style.filter = valid ? `drop-shadow(0 0 5px ${shadowColor})` : 'grayscale(100%)';
+            let filterColor = Array.isArray(piece.color) ? COLORS[piece.color[0]] : COLORS[piece.color];
+            draggedPieceElement.style.filter = valid ? `drop-shadow(0 0 5px ${filterColor})` : 'grayscale(100%)';
         }
 
         function handleDragEnd(e) {
@@ -1102,7 +1062,7 @@
                 availablePieces.splice(selectedPieceIndex, 1);
                 if (availablePieces.length === 0) generateNewPieces();
                 drawPieceSelectors();
-                saveCurrentGame(); // Сохраняем ход
+                saveCurrentGame(); 
             }
             if (draggedPieceElement) draggedPieceElement.remove(); draggedPieceElement = null;
         }
@@ -1126,7 +1086,6 @@
                         const mx = (dropX + x) * MICRO_SCALE; 
                         const my = (dropY + y) * MICRO_SCALE;
                         
-                        // 5) Цвет песка
                         let pieceColorVal;
                         if (Array.isArray(piece.color)) {
                              pieceColorVal = (x < shapeWidthBlocks / 2) ? piece.color[0] : piece.color[1];
@@ -1149,70 +1108,8 @@
             const el = document.getElementById(id);
             if (el) el.addEventListener(event, handler);
         }
-        
-        // --- MISSING HELPER FUNCTIONS & LISTENERS RESTORED ---
-        
-        function addScore(points) {
-            score += points;
-            updateScoreUI();
-        }
 
-        function updateScoreUI() {
-            if (scoreText) scoreText.textContent = score + " / " + 25000; // Пример
-            if (scoreFill) {
-                const pct = Math.min((score / 25000) * 100, 100);
-                scoreFill.style.width = pct + "%";
-            }
-        }
-
-        function darkenColor(color, percent) {
-             // Простая реализация затемнения/осветления HEX цвета
-             // Если передан '#FF3333' и percent -30
-             var f=parseInt(color.slice(1),16),t=percent<0?0:255,p=percent<0?percent*-1:percent,R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF;
-             return "#"+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1);
-        }
-
-        function playSound(id) {
-            if (!settings.sound) return;
-            const s = sounds[id];
-            if (s) {
-                s.currentTime = 0;
-                s.play().catch(e=>console.log(e));
-            }
-        }
-
-        function vibrate(type) {
-            if (!settings.vibration || !navigator.vibrate) return;
-            // Простая вибрация, если поддерживается
-            if (type === 'heavy') navigator.vibrate(50);
-            else navigator.vibrate(20);
-        }
-
-        function showPopupText(text, x, y) {
-            const div = document.createElement('div');
-            div.className = 'popup-text';
-            div.textContent = text;
-            div.style.left = x + 'px';
-            div.style.top = y + 'px';
-            document.body.appendChild(div);
-            setTimeout(() => div.remove(), 1000);
-        }
-
-        // Add magic button listener
-        addSafeListener('magic-btn', 'click', activateMagic);
-        
-        // Add canvas click listener for magic
-        if(canvas) {
-            canvas.addEventListener('mousedown', handleCanvasClick);
-            canvas.addEventListener('touchstart', (e) => {
-                // Предотвращаем дефолтный зум/скролл
-                if(e.cancelable) e.preventDefault();
-                // Передаем первое касание как клик
-                const touch = e.touches[0];
-                handleCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
-            }, {passive: false});
-        }
-
+        // Определяем функцию генерации топа, которой не хватало
         function generateLeaderboard() {
             const names = ["Алексей", "Мария", "Иван", "Елена", "Дмитрий", "Ольга", "Сергей", "Анна", "Николай", "Татьяна"];
             const list = [];
@@ -1253,13 +1150,11 @@
             GAMES_CATALOG.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
-                // 2) Правильный метод VKWebAppOpenApp
                 card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
                 card.onclick = () => {
-                    if (vkBridge) {
-                        vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
-                            .catch(error => console.error("Failed to open app:", error));
-                    }
+                    // 2) Исправлено для открытия игр
+                    vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
+                        .catch(error => console.error("Failed to open app:", error));
                 };
                 list.appendChild(card);
             });
