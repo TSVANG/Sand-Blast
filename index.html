@@ -12,6 +12,7 @@
             -webkit-user-select: none;
             user-select: none;
             touch-action: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -277,7 +278,7 @@
             background: rgba(0, 247, 255, 0.15);
         }
 
-        /* Стили каталога игр */
+        /* Стили каталога игр (ВЗЯТО ИЗ НОВОЙ ВЕРСИИ) */
         .games-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -287,7 +288,7 @@
         .game-card {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
-            padding: 8px;
+            padding: 5px; /* Как в новой версии */
             cursor: pointer;
             transition: transform 0.1s;
             border: 1px solid #444;
@@ -300,7 +301,7 @@
             width: 100%;
             aspect-ratio: 1/1;
             background: #333;
-            border-radius: 16px;
+            border-radius: 16px; /* Сильное скругление из новой версии */
             margin-bottom: 5px;
             object-fit: cover;
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
@@ -469,7 +470,7 @@
         const vkBridge = window.vkBridge;
         vkBridge.send('VKWebAppInit').catch(console.log);
 
-        // --- КАТАЛОГ ИГР (Обновлен PNG) ---
+        // --- КАТАЛОГ ИГР ---
         const GAMES_CATALOG = [
             { id: 54057569, name: "Wordle", img: "Wordle.png" }, 
             { id: 54053077, name: "Виселица", img: "viselitsa.png" },
@@ -531,7 +532,7 @@
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
 
-        // --- 3) СИНХРОНИЗАЦИЯ (ЖЕСТКАЯ С ВКОНТАКТЕ) ---
+        // --- СИНХРОНИЗАЦИЯ (ОРИГИНАЛЬНАЯ, БЕЗ ЛИШНЕГО) ---
         
         async function saveData(key, value) {
             try {
@@ -812,6 +813,7 @@
             showInterstitialAd();
         }
 
+        // --- ГЕНЕРАЦИЯ (ОРИГИНАЛЬНАЯ - ОДИН ЦВЕТ) ---
         function generateNewPieces() {
             availablePieces = [];
             for (let i = 0; i < 3; i++) {
@@ -1113,7 +1115,6 @@
         magicBtn.addEventListener('click', activateMagic);
         canvas.addEventListener('click', handleCanvasClick);
         
-        // 1) Исправленная привязка событий (гарантированно после загрузки)
         function addSafeListener(id, event, handler) {
             const el = document.getElementById(id);
             if (el) el.addEventListener(event, handler);
@@ -1127,7 +1128,7 @@
         addSafeListener('rank-btn', 'click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
         addSafeListener('close-rank-btn', 'click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
         
-        // 2) Исправленный каталог игр
+        // --- КАТАЛОГ ИГР (ИЗ НОВОЙ ВЕРСИИ) ---
         addSafeListener('games-btn', 'click', () => {
             isPaused = true;
             const list = document.getElementById('games-list');
@@ -1135,11 +1136,11 @@
             GAMES_CATALOG.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
-                // 4) Добавлен onerror для картинок
+                // onerror добавлен из новой версии
                 card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
                 card.onclick = () => {
-                    console.log("Opening app:", game.id);
-                    vkBridge.send("VKWebAppShowApp", { app_id: game.id })
+                    // Используем новую механику открытия (VKWebAppOpenApp)
+                    vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
                         .catch(error => console.error("Failed to open app:", error));
                 };
                 list.appendChild(card);
