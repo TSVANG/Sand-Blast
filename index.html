@@ -410,7 +410,7 @@
         </div>
     </div>
 
-    <!-- Окно "Продолжить игру?" -->
+    <!-- Окно "Продолжить игру?" (Оставлено для совместимости, но не используется при старте) -->
     <div id="welcome-modal" class="modal">
         <div class="modal-content">
             <h2>Sand Blast</h2>
@@ -638,19 +638,13 @@
                 init();
                 document.getElementById('tutorial-modal').style.display = 'flex';
             } else if (cloudState && cloudState.score > 0 && cloudState.grid && cloudState.grid.length > 0) {
-                document.getElementById('welcome-modal').style.display = 'flex';
-                
-                document.getElementById('welcome-continue-btn').onclick = () => {
-                    document.getElementById('welcome-modal').style.display = 'none';
-                    restoreGame(cloudState);
-                };
-                
-                document.getElementById('welcome-new-btn').onclick = () => {
-                    document.getElementById('welcome-modal').style.display = 'none';
-                    init();
-                };
+                // Если есть сохранение - восстанавливаем и сразу открываем меню
+                restoreGame(cloudState);
+                document.getElementById('menu-btn').click();
             } else {
+                // Если нет сохранения - инициализируем новую и открываем меню
                 init();
+                document.getElementById('menu-btn').click();
             }
         }
 
