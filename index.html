@@ -278,7 +278,7 @@
             background: rgba(0, 247, 255, 0.15);
         }
 
-        /* Стили каталога игр (ВЗЯТО ИЗ НОВОЙ ВЕРСИИ) */
+        /* Стили каталога игр */
         .games-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -288,7 +288,7 @@
         .game-card {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
-            padding: 5px; /* Как в новой версии */
+            padding: 5px; 
             cursor: pointer;
             transition: transform 0.1s;
             border: 1px solid #444;
@@ -301,7 +301,7 @@
             width: 100%;
             aspect-ratio: 1/1;
             background: #333;
-            border-radius: 16px; /* Сильное скругление из новой версии */
+            border-radius: 16px; 
             margin-bottom: 5px;
             object-fit: cover;
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
@@ -337,7 +337,6 @@
             to { opacity: 0; transform: translateY(-60px) scale(1.2); }
         }
         
-        /* Стили для текстового обучения */
         .tutorial-step {
             margin-bottom: 15px;
             text-align: left;
@@ -410,11 +409,11 @@
         </div>
     </div>
 
-    <!-- Окно "Продолжить игру?" (Оставлено для совместимости, но не используется при старте) -->
+    <!-- Окно "Продолжить игру?" -->
     <div id="welcome-modal" class="modal">
         <div class="modal-content">
-            <h2>Sand Blast</h2>
-            <p style="margin: 20px 0; color: #aaa">Найдена сохраненная игра</p>
+            <h2>Dune Crash</h2>
+            <p style="margin: 20px 0; color: #aaa">Найдена сохраненная игра в облаке</p>
             <button class="modal-btn primary" id="welcome-continue-btn">Продолжить</button>
             <button class="modal-btn" id="welcome-new-btn">Новая игра</button>
         </div>
@@ -531,39 +530,82 @@
         let physicsFrameParity = 0, gameLoopId = null, bannerHeight = 0;
         let settings = { sound: true, vibration: true };
         let stats = { gamesPlayed: 0, record: 0 };
+        let isGameOverCatalogFlow = false;
 
-        // --- СИНХРОНИЗАЦИЯ (ОРИГИНАЛЬНАЯ, БЕЗ ЛИШНЕГО) ---
-        
+        // --- СИНХРОНИЗАЦИЯ С АЛГОРИТМОМ СЖАТИЯ (RLE) ---
+        // VK Storage принимает максимум 4096 байт на ключ. Поэтому мы сжимаем сетку.
+        function compressGrid(gridArray) {
+            let rle = [];
+            let count = 0;
+            let current = gridArray[0][0];
+            for (let r = 0; r < MICRO_ROWS; r++) {
+                for (let c = 0; c < MICRO_COLS; c++) {
+                    if (gridArray[r][c] === current) {
+                        count++;
+                    } else {
+                        rle.push(current === 0 ? count.toString() : `${count}:${current}`);
+                        current = gridArray[r][c];
+                        count = 1;
+                    }
+                }
+            }
+            rle.push(current === 0 ? count.toString() : `${count}:${current}`);
+            return rle.join(',');
+        }
+
+        function decompressGrid(str, rows, cols) {
+            let newGrid = Array.from({ length: rows }, () => Array(cols).fill(0));
+            if (!str) return newGrid;
+            let parts = str.split(',');
+            let index = 0;
+            for (let p of parts) {
+                let count, val;
+                if (p.includes(':')) {
+                    let s = p.split(':');
+                    count = parseInt(s[0]);
+                    val = parseInt(s[1]);
+                } else {
+                    count = parseInt(p);
+                    val = 0;
+                }
+                for (let i = 0; i < count; i++) {
+                    let r = Math.floor(index / cols);
+                    let c = index % cols;
+                    if (r < rows && c < cols) newGrid[r][c] = val;
+                    index++;
+                }
+            }
+            return newGrid;
+        }
+
         async function saveData(key, value) {
             try {
-                // Сохраняем и в локал (для скорости) и в облако
                 const valStr = JSON.stringify(value);
                 localStorage.setItem(key, valStr);
+                // Если данные больше 4096 символов, VKWebAppStorageSet выбросит ошибку!
                 await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
             } catch (e) { console.error("Save error:", e); }
         }
 
         async function loadData(key) {
             try {
-                // Сначала пробуем облако (оно главнее при синхронизации)
                 const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
                 if (data.keys && data.keys[0].value) {
                     return JSON.parse(data.keys[0].value);
                 }
             } catch (e) { console.error("Cloud load error:", e); }
             
-            // Если облако недоступно/пусто, пробуем локал
             const local = localStorage.getItem(key);
             return local ? JSON.parse(local) : null;
         }
 
-        // Сохранение всего состояния игры
         function saveCurrentGame() {
-            // Если игра не окончена
             if (!gameOver) {
                 const state = { 
-                    grid, score, availablePieces, 
-                    stats, // Статистику тоже пишем внутрь, но и отдельно
+                    gridStr: compressGrid(grid), // Сохраняем сжатую сетку (около 200-500 байт вместо 16 КБ)
+                    score, 
+                    availablePieces, 
+                    stats, 
                     timestamp: Date.now() 
                 };
                 saveData('sb_state', state);
@@ -574,9 +616,7 @@
         }
 
         document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === 'hidden') {
-                saveCurrentGame();
-            }
+            if (document.visibilityState === 'hidden') saveCurrentGame();
         });
 
         // --- РЕКЛАМА ---
@@ -637,12 +677,11 @@
                 localStorage.setItem('sb_tutorial_shown', 'true');
                 init();
                 document.getElementById('tutorial-modal').style.display = 'flex';
-            } else if (cloudState && cloudState.score > 0 && cloudState.grid && cloudState.grid.length > 0) {
-                // Если есть сохранение - восстанавливаем и сразу открываем меню
-                restoreGame(cloudState);
-                document.getElementById('menu-btn').click();
+            } else if (cloudState && cloudState.score > 0 && (cloudState.gridStr || (cloudState.grid && cloudState.grid.length > 0))) {
+                // Если есть сохранение - показываем модалку "Продолжить / Новая игра"
+                window.pendingCloudState = cloudState;
+                document.getElementById('welcome-modal').style.display = 'flex';
             } else {
-                // Если нет сохранения - инициализируем новую и открываем меню
                 init();
                 document.getElementById('menu-btn').click();
             }
@@ -650,7 +689,9 @@
 
         function restoreGame(data) {
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
-            grid = data.grid;
+            
+            // Восстанавливаем либо из новой сжатой строки, либо из старого формата (для совместимости)
+            grid = data.gridStr ? decompressGrid(data.gridStr, MICRO_ROWS, MICRO_COLS) : data.grid;
             score = data.score;
             availablePieces = data.availablePieces || [];
             if (data.stats) stats = data.stats;
@@ -792,6 +833,7 @@
             }
         }
 
+        // Логика конца игры: показываем межстраничную рекламу, затем сразу каталог
         function endGame() {
             if (gameOver) return;
             gameOver = true;
@@ -802,12 +844,13 @@
             saveData('sb_state', null);
             
             finalScoreSpan.textContent = score;
-            document.getElementById('gameover-modal').style.display = 'flex';
             vibrate('error');
             showInterstitialAd();
+            
+            // Вместо gameover-modal сразу открываем каталог
+            openGamesCatalog(true);
         }
 
-        // --- ГЕНЕРАЦИЯ (ОРИГИНАЛЬНАЯ - ОДИН ЦВЕТ) ---
         function generateNewPieces() {
             availablePieces = [];
             for (let i = 0; i < 3; i++) {
@@ -1115,6 +1158,25 @@
             else console.warn('Element not found:', id);
         }
 
+        // Общая функция для открытия каталога
+        function openGamesCatalog(fromGameOver = false) {
+            if (!fromGameOver) isPaused = true;
+            isGameOverCatalogFlow = fromGameOver;
+            const list = document.getElementById('games-list');
+            list.innerHTML = '';
+            GAMES_CATALOG.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
+                card.onclick = () => {
+                    vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
+                        .catch(error => console.error("Failed to open app:", error));
+                };
+                list.appendChild(card);
+            });
+            document.getElementById('games-modal').style.display = 'flex';
+        }
+
         addSafeListener('menu-btn', 'click', () => { isPaused = true; document.getElementById('stat-games').textContent = stats.gamesPlayed; document.getElementById('stat-record').textContent = stats.record; document.getElementById('menu-modal').style.display = 'flex'; });
         addSafeListener('resume-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; isPaused = false; });
         addSafeListener('restart-menu-btn', 'click', init);
@@ -1122,28 +1184,18 @@
         addSafeListener('rank-btn', 'click', () => { isPaused = true; generateLeaderboard(); document.getElementById('rank-modal').style.display = 'flex'; });
         addSafeListener('close-rank-btn', 'click', () => { document.getElementById('rank-modal').style.display = 'none'; isPaused = false; });
         
-        // --- КАТАЛОГ ИГР (ИЗ НОВОЙ ВЕРСИИ) ---
-        addSafeListener('games-btn', 'click', () => {
-            isPaused = true;
-            const list = document.getElementById('games-list');
-            list.innerHTML = '';
-            GAMES_CATALOG.forEach(game => {
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                // onerror добавлен из новой версии
-                card.innerHTML = `<img src="${game.img}" class="game-img" alt="${game.name}" onerror="this.style.display='none'"><div class="game-title">${game.name}</div>`;
-                card.onclick = () => {
-                    // Используем новую механику открытия (VKWebAppOpenApp)
-                    vkBridge.send("VKWebAppOpenApp", { app_id: game.id, location: "catalog" })
-                        .catch(error => console.error("Failed to open app:", error));
-                };
-                list.appendChild(card);
-            });
-            document.getElementById('games-modal').style.display = 'flex';
-        });
+        // Каталог игр
+        addSafeListener('games-btn', 'click', () => openGamesCatalog(false));
+        
         addSafeListener('close-games-btn', 'click', () => {
             document.getElementById('games-modal').style.display = 'none';
-            isPaused = false;
+            // Если каталог открыт после проигрыша, то после его закрытия показываем Game Over
+            if (isGameOverCatalogFlow) {
+                isGameOverCatalogFlow = false;
+                document.getElementById('gameover-modal').style.display = 'flex';
+            } else {
+                isPaused = false;
+            }
         });
 
         addSafeListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; });
@@ -1151,9 +1203,24 @@
         addSafeListener('sound-toggle', 'change', (e) => { settings.sound = e.target.checked; if(settings.sound) sounds.bg.play(); else sounds.bg.pause(); });
         addSafeListener('vibration-toggle', 'change', (e) => { settings.vibration = e.target.checked; });
 
-        // Добавляем обработчики модальному окну продолжения
-        addSafeListener('welcome-continue-btn', 'click', () => { /* обработчик задается в bootGame */ });
-        addSafeListener('welcome-new-btn', 'click', () => { /* обработчик задается в bootGame */ });
+        // Обработчики окна "Продолжить" (Welcome)
+        addSafeListener('welcome-continue-btn', 'click', () => { 
+            document.getElementById('welcome-modal').style.display = 'none';
+            if (window.pendingCloudState) {
+                restoreGame(window.pendingCloudState);
+                window.pendingCloudState = null;
+            } else {
+                init();
+            }
+            isPaused = false;
+        });
+        
+        addSafeListener('welcome-new-btn', 'click', () => { 
+            document.getElementById('welcome-modal').style.display = 'none';
+            window.pendingCloudState = null;
+            init();
+            isPaused = false;
+        });
 
         piecesContainer.addEventListener('mousedown', handleDragStart);
         piecesContainer.addEventListener('touchstart', handleDragStart, { passive: false });
