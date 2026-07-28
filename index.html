@@ -459,7 +459,7 @@
     <div id="welcome-modal" class="modal">
         <div class="modal-content">
             <h2>Dune Crash</h2>
-            <p style="margin: 20px 0; color: #aaa">Найдена сохраненная игра в облаке</p>
+            <p style="margin: 20px 0; color: #aaa">Найдена сохраненная сессия</p>
             <button class="modal-btn primary" id="welcome-continue-btn">Продолжить</button>
             <button class="modal-btn" id="welcome-new-btn">Новая игра</button>
         </div>
@@ -587,29 +587,68 @@
         let stats = { gamesPlayed: 0, record: 0 };
         let isGameOverCatalogFlow = false;
 
-        // --- СИНХРОНИЗАЦИЯ С АЛГОРИТМОМ СЖАТИЯ (RLE) ---
+        // --- СИНХРОНИЗАЦИЯ И СЖАТИЕ (RLE V2) ---
         function compressGrid(gridArray) {
-            let rle = [];
+            let result = '';
             let count = 0;
             let current = gridArray[0][0];
+            
+            const toChar = (val) => {
+                if (val === 0) return '.';
+                if (val > 0) return String.fromCharCode(96 + val); 
+                return String.fromCharCode(64 - val); 
+            };
+
             for (let r = 0; r < MICRO_ROWS; r++) {
                 for (let c = 0; c < MICRO_COLS; c++) {
                     if (gridArray[r][c] === current) {
                         count++;
                     } else {
-                        rle.push(current === 0 ? count.toString() : `${count}:${current}`);
+                        result += count + toChar(current);
                         current = gridArray[r][c];
                         count = 1;
                     }
                 }
             }
-            rle.push(current === 0 ? count.toString() : `${count}:${current}`);
-            return rle.join(',');
+            result += count + toChar(current);
+            return result;
         }
 
         function decompressGrid(str, rows, cols) {
             let newGrid = Array.from({ length: rows }, () => Array(cols).fill(0));
             if (!str) return newGrid;
+            if (str.includes(',')) return decompressGridOld(str, rows, cols); // Старый формат
+            
+            const fromChar = (char) => {
+                if (char === '.') return 0;
+                if (char >= 'a' && char <= 'h') return char.charCodeAt(0) - 96;
+                if (char >= 'A' && char <= 'H') return -(char.charCodeAt(0) - 64);
+                return 0;
+            };
+
+            let index = 0;
+            let numStr = '';
+            for (let i = 0; i < str.length; i++) {
+                let char = str[i];
+                if (char >= '0' && char <= '9') {
+                    numStr += char;
+                } else {
+                    let count = parseInt(numStr);
+                    let val = fromChar(char);
+                    numStr = '';
+                    for (let k = 0; k < count; k++) {
+                        let r = Math.floor(index / cols);
+                        let c = index % cols;
+                        if (r < rows && c < cols) newGrid[r][c] = val;
+                        index++;
+                    }
+                }
+            }
+            return newGrid;
+        }
+
+        function decompressGridOld(str, rows, cols) {
+            let newGrid = Array.from({ length: rows }, () => Array(cols).fill(0));
             let parts = str.split(',');
             let index = 0;
             for (let p of parts) {
@@ -632,29 +671,44 @@
             return newGrid;
         }
 
+        const saveTimeouts = {};
         async function saveData(key, value) {
             try {
                 const valStr = JSON.stringify(value);
-                localStorage.setItem(key, valStr);
-                await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
+                localStorage.setItem(key, valStr); // Локально сохраняем моментально
+                
+                // Дебаунс для облака, чтобы не ловить лимиты API ВК
+                if (saveTimeouts[key]) clearTimeout(saveTimeouts[key]);
+                saveTimeouts[key] = setTimeout(async () => {
+                    try {
+                        await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
+                    } catch (e) { console.error("Cloud save error:", e); }
+                }, 2000);
             } catch (e) { console.error("Save error:", e); }
         }
 
         async function loadData(key) {
+            let cloudData = null;
             try {
-                // Умный таймаут
+                // Увеличен таймаут до 4 сек, чтобы мобилка успела прогрузить облако
                 const fetchPromise = vkBridge.send('VKWebAppStorageGet', { keys: [key] });
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('VK Storage Timeout')), 1500));
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('VK Storage Timeout')), 4000));
                 
                 const data = await Promise.race([fetchPromise, timeoutPromise]);
                 
                 if (data && data.keys && data.keys[0].value) {
-                    return JSON.parse(data.keys[0].value);
+                    cloudData = JSON.parse(data.keys[0].value);
                 }
-            } catch (e) { console.log("Cloud load error or timeout, falling back to local:", e.message); }
+            } catch (e) { console.log("Cloud fetch issue:", e.message); }
             
-            const local = localStorage.getItem(key);
-            return local ? JSON.parse(local) : null;
+            const localStr = localStorage.getItem(key);
+            const localData = localStr ? JSON.parse(localStr) : null;
+
+            // Выбираем самое свежее сохранение!
+            if (cloudData && localData) {
+                return (cloudData.timestamp || 0) > (localData.timestamp || 0) ? cloudData : localData;
+            }
+            return cloudData || localData;
         }
 
         function saveCurrentGame() {
@@ -675,7 +729,17 @@
         }
 
         document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === 'hidden') saveCurrentGame();
+            if (document.visibilityState === 'hidden') {
+                saveCurrentGame();
+                // Принудительно отправляем зависшие облачные сохранения при сворачивании
+                for (let key in saveTimeouts) {
+                    clearTimeout(saveTimeouts[key]);
+                    let valStr = localStorage.getItem(key);
+                    if (valStr) {
+                        vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr }).catch(()=>{});
+                    }
+                }
+            }
         });
 
         // --- РЕКЛАМА ---
