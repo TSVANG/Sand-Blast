@@ -172,18 +172,6 @@
             to { box-shadow: 0 0 25px #ff00de, 0 0 10px #fff; }
         }
         
-        .ad-icon {
-            display: inline-block;
-            background: #fff;
-            color: #d900ff;
-            border-radius: 3px;
-            padding: 0 3px;
-            font-size: 0.7em;
-            margin-left: 4px;
-            vertical-align: middle;
-            font-weight: 900;
-        }
-
         #pieces-container {
             width: 100%;
             height: 80px;
@@ -374,6 +362,34 @@
             margin-bottom: 5px;
             font-size: 1.1em;
         }
+
+        /* Анимация обучения магии */
+        .tutorial-magic-demo {
+            position: relative; width: 150px; height: 80px; margin: 10px auto;
+            background: rgba(0,0,0,0.5); border: 1px solid #444; border-radius: 8px; padding: 5px;
+            overflow: hidden;
+        }
+        .t-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 4px; width: 100%; height: 100%; }
+        .t-block { border-radius: 3px; }
+        .t-block.red { background: #FF3333; animation: magicDisappear 3s infinite; }
+        .t-block.blue { background: #3333FF; }
+        .t-block.yellow { background: #FFFF33; }
+        .t-wand {
+            position: absolute; right: 10px; bottom: -15px; font-size: 28px;
+            animation: wandMove 3s infinite;
+            filter: drop-shadow(0 0 5px #d900ff);
+        }
+        @keyframes wandMove {
+            0%, 10% { transform: translate(0, 0); }
+            25% { transform: translate(-65px, -30px) rotate(-15deg); }
+            35% { transform: translate(-65px, -30px) scale(0.8) rotate(-15deg); }
+            50%, 100% { transform: translate(0, 0); }
+        }
+        @keyframes magicDisappear {
+            0%, 35% { opacity: 1; transform: scale(1); }
+            40%, 85% { opacity: 0; transform: scale(0); }
+            100% { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -408,7 +424,7 @@
     <div id="controls-area">
         <div id="buttons-row">
             <button id="menu-btn" class="icon-btn">⏸️ Меню</button>
-            <button id="magic-btn" class="icon-btn">✨ Магия <span class="ad-icon">AD</span></button>
+            <button id="magic-btn" class="icon-btn">✨ Магия (3)</button>
             <button id="rank-btn" class="icon-btn">🏆 Топ</button>
             <button id="share-btn" class="icon-btn">📢 Поделиться</button>
             <button id="games-btn" class="icon-btn" style="display: none;">🎮 Игры</button>
@@ -466,7 +482,7 @@
         </div>
     </div>
 
-    <!-- Обучение (текстовое) -->
+    <!-- Обучение (текстовое + визуальное) -->
     <div id="tutorial-modal" class="modal">
         <div class="modal-content">
             <h2>Как играть</h2>
@@ -480,7 +496,15 @@
             </div>
             <div class="tutorial-step">
                 <strong>3. Магия</strong>
-                Нажми на кнопку "Магия" (за рекламу), чтобы удалить любой выбранный цвет с поля.
+                Кликни по магии, а затем выбери цвет на поле. Все блоки этого цвета исчезнут!
+                <div class="tutorial-magic-demo">
+                    <div class="t-grid">
+                        <div class="t-block red"></div><div class="t-block blue"></div><div class="t-block yellow"></div><div class="t-block red"></div>
+                        <div class="t-block blue"></div><div class="t-block red"></div><div class="t-block blue"></div><div class="t-block yellow"></div>
+                    </div>
+                    <div class="t-wand">✨</div>
+                </div>
+                <div style="font-size: 0.8em; color: #aaa; margin-top: 5px;">В начале дается 3 попытки бесплатно! Вы получите еще +1 попытку за каждые 25 000 очков.</div>
             </div>
             <button class="modal-btn primary" id="close-tutorial-btn">Всё понятно!</button>
         </div>
@@ -554,6 +578,7 @@
         ];
 
         let grid = [], score = 0, gameOver = false, isPaused = false;
+        let freeMagicUses = 3; // Базовое количество попыток магии
         let availablePieces = [], selectedPieceIndex = -1, isDragging = false;
         let draggedPieceElement = null, isBoardStable = true, isClearingLines = false;
         let pixelsToAnimate = [], clearAnimationTimer = 0, isMagicActive = false;
@@ -563,7 +588,6 @@
         let isGameOverCatalogFlow = false;
 
         // --- СИНХРОНИЗАЦИЯ С АЛГОРИТМОМ СЖАТИЯ (RLE) ---
-        // VK Storage принимает максимум 4096 байт на ключ. Поэтому мы сжимаем сетку.
         function compressGrid(gridArray) {
             let rle = [];
             let count = 0;
@@ -612,14 +636,13 @@
             try {
                 const valStr = JSON.stringify(value);
                 localStorage.setItem(key, valStr);
-                // Если данные больше 4096 символов, VKWebAppStorageSet выбросит ошибку!
                 await vkBridge.send('VKWebAppStorageSet', { key: key, value: valStr });
             } catch (e) { console.error("Save error:", e); }
         }
 
         async function loadData(key) {
             try {
-                // Умный таймаут: ждем ответа от ВК максимум 1.5 секунды, чтобы игра не зависала на ПК
+                // Умный таймаут
                 const fetchPromise = vkBridge.send('VKWebAppStorageGet', { keys: [key] });
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('VK Storage Timeout')), 1500));
                 
@@ -637,8 +660,9 @@
         function saveCurrentGame() {
             if (!gameOver) {
                 const state = { 
-                    gridStr: compressGrid(grid), // Сохраняем сжатую сетку (около 200-500 байт вместо 16 КБ)
+                    gridStr: compressGrid(grid), 
                     score, 
+                    freeMagicUses,
                     availablePieces, 
                     stats, 
                     timestamp: Date.now() 
@@ -709,18 +733,18 @@
                 const isFirstRun = !localStorage.getItem('sb_tutorial_shown');
                 const cloudState = await loadData('sb_state');
 
-                // Убираем загрузочный экран, как только данные получены
                 const loader = document.getElementById('loading-overlay');
                 if (loader) loader.style.display = 'none';
 
-                if (isFirstRun) {
+                // ИСПРАВЛЕНИЕ СИНХРОНИЗАЦИИ ПК: ПРИОРИТЕТ СОХРАНЕНИЙ ИЗ ОБЛАКА
+                if (cloudState && cloudState.score > 0 && (cloudState.gridStr || (cloudState.grid && cloudState.grid.length > 0))) {
+                    localStorage.setItem('sb_tutorial_shown', 'true');
+                    window.pendingCloudState = cloudState;
+                    document.getElementById('welcome-modal').style.display = 'flex';
+                } else if (isFirstRun) {
                     localStorage.setItem('sb_tutorial_shown', 'true');
                     init();
                     document.getElementById('tutorial-modal').style.display = 'flex';
-                } else if (cloudState && cloudState.score > 0 && (cloudState.gridStr || (cloudState.grid && cloudState.grid.length > 0))) {
-                    // Если есть сохранение - показываем модалку "Продолжить / Новая игра"
-                    window.pendingCloudState = cloudState;
-                    document.getElementById('welcome-modal').style.display = 'flex';
                 } else {
                     init();
                     document.getElementById('menu-btn').click();
@@ -735,9 +759,9 @@
         function restoreGame(data) {
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             
-            // Восстанавливаем либо из новой сжатой строки, либо из старого формата (для совместимости)
             grid = data.gridStr ? decompressGrid(data.gridStr, MICRO_ROWS, MICRO_COLS) : data.grid;
             score = data.score;
+            freeMagicUses = data.freeMagicUses !== undefined ? data.freeMagicUses : 3;
             availablePieces = data.availablePieces || [];
             if (data.stats) stats = data.stats;
             
@@ -745,6 +769,7 @@
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
             resizeGame();
+            updateMagicState();
             updateScoreUI();
             drawPieceSelectors();
             draw();
@@ -757,7 +782,7 @@
             
             resizeGame();
             grid = Array.from({ length: MICRO_ROWS }, () => Array(MICRO_COLS).fill(0));
-            score = 0; gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false;
+            score = 0; freeMagicUses = 3; gameOver = false; isPaused = false; isMagicActive = false; isClearingLines = false;
             pixelsToAnimate = []; isBoardStable = true; clearAnimationTimer = 0;
             isDragging = false; selectedPieceIndex = -1;
             if (draggedPieceElement) { draggedPieceElement.remove(); draggedPieceElement = null; }
@@ -878,7 +903,6 @@
             }
         }
 
-        // Логика конца игры: показываем межстраничную рекламу, затем сразу каталог
         function endGame() {
             if (gameOver) return;
             gameOver = true;
@@ -892,7 +916,6 @@
             vibrate('error');
             showInterstitialAd();
             
-            // Вместо gameover-modal сразу открываем каталог
             openGamesCatalog(true);
         }
 
@@ -912,16 +935,23 @@
             drawPieceSelectors();
         }
 
+        // ОБНОВЛЕННАЯ ЛОГИКА МАГИИ БЕЗ ЗНАЧКА AD
         function activateMagic() {
             if (isMagicActive) { 
                 isMagicActive = false; 
                 updateMagicState(); 
             } else { 
-                showRewardedAd(() => { 
-                    isMagicActive = true; 
-                    showPopupText("НАЖМИ НА ЦВЕТ!", canvas.width/2, canvas.height/3); 
-                    updateMagicState(); 
-                }); 
+                if (freeMagicUses > 0) {
+                    isMagicActive = true;
+                    showPopupText("НАЖМИ НА ЦВЕТ!", canvas.width/2, canvas.height/3);
+                    updateMagicState();
+                } else {
+                    showRewardedAd(() => { 
+                        isMagicActive = true; 
+                        showPopupText("НАЖМИ НА ЦВЕТ!", canvas.width/2, canvas.height/3); 
+                        updateMagicState(); 
+                    }); 
+                }
             }
         }
         
@@ -932,7 +962,7 @@
                 gameWrapper.classList.add('magic-active');
             } else { 
                 magicBtn.classList.remove('active'); 
-                magicBtn.innerHTML = '✨ Магия <span class="ad-icon">AD</span>';
+                magicBtn.innerHTML = `✨ Магия (${freeMagicUses})`;
                 gameWrapper.classList.remove('magic-active');
             }
         }
@@ -946,6 +976,8 @@
                 const colorVal = Math.abs(grid[y][x]);
                 if (colorVal !== 0) {
                     playSound('magic'); vibrate('heavy'); 
+                    if (freeMagicUses > 0) freeMagicUses--; // Списываем бесплатную попытку только при успешном клике
+
                     for(let r=0; r<MICRO_ROWS; r++) for(let c=0; c<MICRO_COLS; c++) if(Math.abs(grid[r][c]) === colorVal) grid[r][c] = 0;
                     isBoardStable = false; isMagicActive = false; updateMagicState(); 
                     saveCurrentGame();
@@ -1123,6 +1155,7 @@
             }
         }
 
+        // ОБНОВЛЕННЫЙ ПОДСЧЕТ И НАЧИСЛЕНИЕ МАГИИ
         function updateScoreUI() {
             let currentLevelBase = Math.floor(score / 25000) * 25000;
             let nextGoal = currentLevelBase + 25000;
@@ -1133,7 +1166,22 @@
             else scoreFill.style.background = 'linear-gradient(90deg, #e94560, #ff6b6b)';
         }
 
-        function addScore(points) { score += points; updateScoreUI(); }
+        function addScore(points) { 
+            let prevLevel = Math.floor(score / 25000);
+            score += points; 
+            let newLevel = Math.floor(score / 25000);
+
+            // Если перешли рубеж 25000 очков - даем +1 магию
+            if (newLevel > prevLevel) {
+                let earned = newLevel - prevLevel;
+                freeMagicUses += earned;
+                showPopupText(`+${earned} МАГИЯ!`, canvas.width/2, canvas.height/4);
+                updateMagicState();
+            }
+
+            updateScoreUI(); 
+        }
+
         function showPopupText(text, x, y) {
             const el = document.createElement('div'); el.className = 'popup-text'; el.textContent = text;
             el.style.left = x + 'px'; el.style.top = y + 'px'; document.body.appendChild(el);
