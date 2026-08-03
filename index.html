@@ -529,6 +529,7 @@
             { id: 54053077, name: "Виселица", img: "viselitsa.png" },
             { id: 54051783, name: "Numberzilla", img: "Numberzilla.png" },
             { id: 54040298, name: "Судоку", img: "Sudoku.png" },
+            { id: 53993726, name: "Кибер-Змей 3000", img: "Zmei.png" }
         ];
 
         const canvas = document.getElementById('gameCanvas');
@@ -979,7 +980,7 @@
             vibrate('error');
             showInterstitialAd();
             
-            openGamesCatalog(true);
+            document.getElementById('gameover-modal').style.display = 'flex';
         }
 
         function generateNewPieces() {
@@ -1352,13 +1353,7 @@
         
         addSafeListener('close-games-btn', 'click', () => {
             document.getElementById('games-modal').style.display = 'none';
-            // Если каталог открыт после проигрыша, то после его закрытия показываем Game Over
-            if (isGameOverCatalogFlow) {
-                isGameOverCatalogFlow = false;
-                document.getElementById('gameover-modal').style.display = 'flex';
-            } else {
-                isPaused = false;
-            }
+            isPaused = false;
         });
 
         addSafeListener('tutorial-btn', 'click', () => { document.getElementById('menu-modal').style.display = 'none'; document.getElementById('tutorial-modal').style.display = 'flex'; });
